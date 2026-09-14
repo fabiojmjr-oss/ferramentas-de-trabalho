@@ -55,7 +55,8 @@ ignore = ["PD010", "PD011"]
 "tests/*" = ["E501"]
 
 [tool.mypy]
-python_version = "3.10"
+# No python_version pin: CI runs a version matrix, and pinning it makes mypy reject the
+# numpy stubs of whichever interpreter is newer than the pin.
 files = ["src/oplab"]
 strict = false
 warn_unused_ignores = true
@@ -66,6 +67,9 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
+markers = [
+  "slow: builds the full default dataset; a few seconds each",
+]
 
 [tool.coverage.run]
 source = ["oplab"]

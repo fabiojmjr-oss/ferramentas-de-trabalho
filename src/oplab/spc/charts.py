@@ -320,7 +320,7 @@ def p_chart(
     # The centre line is the pooled proportion, not the mean of the proportions: points built
     # on larger samples must carry more weight.
     p_bar = float(fit_counts.sum() / fit_sizes.sum())
-    sigma = np.sqrt(p_bar * (1 - p_bar) / sizes).rename("sigma")
+    sigma = (p_bar * (1 - p_bar) / sizes).pow(0.5).rename("sigma")
 
     return ControlChart(
         name="p",
@@ -371,7 +371,7 @@ def u_chart(
     fit_units = units if baseline is None else units.iloc[baseline]
 
     u_bar = float(fit_counts.sum() / fit_units.sum())
-    sigma = np.sqrt(u_bar / units).rename("sigma")
+    sigma = (u_bar / units).pow(0.5).rename("sigma")
 
     return ControlChart(
         name="u",

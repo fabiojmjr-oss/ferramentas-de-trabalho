@@ -67,33 +67,47 @@ def inventory_record_accuracy(
             missing = int(frame["abs_variance_value"].isna().sum())
             raise KeyError(f"unit_cost is missing a price for {missing} counted row(s)")
 
-    def summarise(group: pd.DataFrame) -> pd.Series:
-        system_units = float(group["system_qty"].sum())
-        abs_variance = float(group["abs_variance"].sum())
-        net_variance = float(group["variance"].sum())
-        stats = {
-            "locations_counted": float(len(group)),
-            "location_accuracy": float(group["match"].mean()),
-            "unit_accuracy_abs": 1.0 - abs_variance / system_units if system_units else np.nan,
-            "unit_accuracy_net": (
-                1.0 - abs(net_variance) / system_units if system_units else np.nan
-            ),
-            "system_units": system_units,
-            "abs_variance_units": abs_variance,
-            "net_variance_units": net_variance,
-        }
-        if unit_cost is not None:
-            stats["abs_variance_value"] = float(group["abs_variance_value"].sum())
-        return pd.Series(stats)
+    # Aggregate the three sums the ratios are built from, then derive the ratios once, so the
+    # grouped and ungrouped paths cannot drift apart.
+    aggregations: dict[str, tuple[str, str]] = {
+        "locations_counted": ("match", "size"),
+        "location_accuracy": ("match", "mean"),
+        "system_units": ("system_qty", "sum"),
+        "abs_variance_units": ("abs_variance", "sum"),
+        "net_variance_units": ("variance", "sum"),
+    }
+    if unit_cost is not None:
+        aggregations["abs_variance_value"] = ("abs_variance_value", "sum")
 
-    if by is None:
-        return summarise(frame).to_frame().T.reset_index(drop=True)
+    keys = None if by is None else ([by] if isinstance(by, str) else list(by))
+    if keys is None:
+        totals = pd.DataFrame(
+            [{name: frame[column].agg(how) for name, (column, how) in aggregations.items()}]
+        )
+    else:
+        totals = frame.groupby(keys, observed=True).agg(**aggregations).reset_index()
 
-    keys = [by] if isinstance(by, str) else list(by)
-    result = frame.groupby(keys, observed=True).apply(summarise, include_groups=False)
-    result = result.reset_index()
-    result["locations_counted"] = result["locations_counted"].astype(int)
-    return result.sort_values("location_accuracy", ascending=False, ignore_index=True)
+    system_units = totals["system_units"].replace(0, np.nan)
+    totals["unit_accuracy_abs"] = 1.0 - totals["abs_variance_units"] / system_units
+    totals["unit_accuracy_net"] = 1.0 - totals["net_variance_units"].abs() / system_units
+    totals["locations_counted"] = totals["locations_counted"].astype(int)
+
+    ordered = [
+        "locations_counted",
+        "location_accuracy",
+        "unit_accuracy_abs",
+        "unit_accuracy_net",
+        "system_units",
+        "abs_variance_units",
+        "net_variance_units",
+    ]
+    if unit_cost is not None:
+        ordered.append("abs_variance_value")
+    columns = ([] if keys is None else keys) + ordered
+
+    if keys is None:
+        return totals[columns]
+    return totals[columns].sort_values("location_accuracy", ascending=False, ignore_index=True)
 
 
 def variance_pareto(

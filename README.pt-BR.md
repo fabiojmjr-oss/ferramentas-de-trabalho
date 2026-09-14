@@ -144,6 +144,11 @@ derivados à mão. Indicador testado apenas contra a própria implementação n�
 **Nenhum dado real, em nenhuma hipótese.** Toda tabela vem de `oplab.synth` com semente fixa.
 Ver [`DISCLAIMER.md`](DISCLAIMER.md).
 
+**O README está sob teste.** Todo número citado acima é verificado em
+`tests/test_readme_claims.py`, e os scripts de exemplo também são executados lá. Qualquer
+mudança que mova um desses números quebra o build em vez de deixar o texto silenciosamente
+errado.
+
 ## Limitações
 
 Ditas com clareza, porque as lacunas importam tanto quanto a cobertura:
@@ -166,7 +171,7 @@ Ditas com clareza, porque as lacunas importam tanto quanto a cobertura:
 ```bash
 ruff check . && ruff format --check .   # lint e formatação
 mypy                                    # verificação de tipos
-pytest --cov                            # 131 testes, 94% de cobertura de statements
+pytest --cov                            # 140 testes, 94% de cobertura de statements
 ```
 
 A CI roda os quatro em Python 3.10 e 3.12.

@@ -136,14 +136,15 @@ def _attach_fulfilment(
     pick_pack_h = timing["pick_pack_h"].to_numpy()
     transit_h = timing["transit_h"].to_numpy()
 
-    order_ts = lines["order_ts"].to_numpy()
-    ship_ts = order_ts + pd.to_timedelta(np.round(pick_pack_h, 3), unit="h").to_numpy()
-    delivered_ts = ship_ts + pd.to_timedelta(np.round(transit_h, 3), unit="h").to_numpy()
+    # The arithmetic stays in pandas so that the censoring below can use Series.mask, which
+    # writes NaT while preserving the datetime dtype.
+    ship_ts = lines["order_ts"] + pd.to_timedelta(np.round(pick_pack_h, 3), unit="h")
+    delivered_ts = ship_ts + pd.to_timedelta(np.round(transit_h, 3), unit="h")
 
-    horizon_end = np.datetime64(pd.Timestamp(cfg.start) + pd.Timedelta(days=cfg.days), "ns")
+    horizon_end = pd.Timestamp(cfg.start) + pd.Timedelta(days=cfg.days)
     never_shipped = cancelled | (qty_shipped == 0)
-    not_yet_shipped = (~never_shipped) & (ship_ts > horizon_end)
-    in_transit = (~never_shipped) & (~not_yet_shipped) & (delivered_ts > horizon_end)
+    not_yet_shipped = (~never_shipped) & (ship_ts > horizon_end).to_numpy()
+    in_transit = (~never_shipped) & (~not_yet_shipped) & (delivered_ts > horizon_end).to_numpy()
 
     damaged = rng.random(n) < DAMAGE_RATE
     qty_delivered = np.where(damaged, np.maximum(0, qty_shipped - 1), qty_shipped)
@@ -154,16 +155,13 @@ def _attach_fulfilment(
     status[qty_shipped == 0] = "stockout"
     status[cancelled] = "cancelled"
 
-    nat = np.datetime64("NaT", "ns")
-    ship_ts = np.where(never_shipped | not_yet_shipped, nat, ship_ts)
-    delivered_ts = np.where(never_shipped | not_yet_shipped | in_transit, nat, delivered_ts)
     qty_delivered = np.where(status == "delivered", qty_delivered, 0)
 
     out = lines.copy()
     out["qty_shipped"] = qty_shipped
     out["qty_delivered"] = qty_delivered
-    out["ship_ts"] = pd.to_datetime(ship_ts)
-    out["delivered_ts"] = pd.to_datetime(delivered_ts)
+    out["ship_ts"] = ship_ts.mask(never_shipped | not_yet_shipped)
+    out["delivered_ts"] = delivered_ts.mask(never_shipped | not_yet_shipped | in_transit)
     out["status"] = pd.Categorical(
         status, categories=["delivered", "in_transit", "open", "stockout", "cancelled"]
     )

@@ -145,6 +145,10 @@ metric tested only against its own implementation tests nothing.
 **No real data, ever.** Every table comes from `oplab.synth` with a fixed seed. See
 [`DISCLAIMER.md`](DISCLAIMER.md).
 
+**The README is under test.** Every figure quoted above is asserted in
+`tests/test_readme_claims.py`, and the example scripts are executed there too. Any change that
+moves one of these numbers breaks the build rather than leaving the text quietly wrong.
+
 ## Limitations
 
 Stated plainly, because the gaps matter as much as the coverage:
@@ -166,7 +170,7 @@ Stated plainly, because the gaps matter as much as the coverage:
 ```bash
 ruff check . && ruff format --check .   # lint and format
 mypy                                    # type check
-pytest --cov                            # 131 tests, 94% statement coverage
+pytest --cov                            # 140 tests, 94% statement coverage
 ```
 
 CI runs all four on Python 3.10 and 3.12.
