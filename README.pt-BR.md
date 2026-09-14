@@ -42,8 +42,8 @@ Mais cinco ferramentas estão planejadas. Sequência e regra de seleção em
 ```bash
 git clone https://github.com/fabiojmjr-oss/ferramentas-de-trabalho.git
 cd ferramentas-de-trabalho
-pip install -e ".[dev]"
-pytest
+make install
+make check
 ```
 
 ## Trinta segundos
@@ -240,12 +240,18 @@ Ditas com clareza, porque as lacunas importam tanto quanto a cobertura:
 ## Desenvolvimento
 
 ```bash
-ruff check . && ruff format --check .   # lint e formatação
-mypy                                    # verificação de tipos
-pytest --cov                            # 204 testes, 94% de cobertura de statements
+make install   # instalação editável com as ferramentas de desenvolvimento
+make check     # lint, formatação, tipos e testes - exatamente o que a CI roda
+make examples  # roda os cinco scripts de exemplo
 ```
 
-A CI roda os quatro em Python 3.10 e 3.12.
+O `make check` existe porque a alternativa falhou duas vezes: rodar o linter e esquecer o
+formatador, e rodar uma ferramenta local mais antiga que a instalada pela CI. As duas
+transformaram uma mudança correta em build vermelho, então os linters estão fixados em release
+compatível e a sequência inteira vive em um único alvo. A CI roda as mesmas quatro verificações
+em Python 3.10 e 3.12.
+
+204 testes, 94% de cobertura de statements.
 
 ## Licença
 

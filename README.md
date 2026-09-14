@@ -42,8 +42,8 @@ Five more tools are planned. Build sequence and selection rule in
 ```bash
 git clone https://github.com/fabiojmjr-oss/ferramentas-de-trabalho.git
 cd ferramentas-de-trabalho
-pip install -e ".[dev]"
-pytest
+make install
+make check
 ```
 
 ## Thirty seconds
@@ -237,12 +237,17 @@ Stated plainly, because the gaps matter as much as the coverage:
 ## Development
 
 ```bash
-ruff check . && ruff format --check .   # lint and format
-mypy                                    # type check
-pytest --cov                            # 204 tests, 94% statement coverage
+make install   # editable install with the dev tools
+make check     # lint, format check, type check, test - exactly what CI runs
+make examples  # run all five example scripts
 ```
 
-CI runs all four on Python 3.10 and 3.12.
+`make check` exists because the alternative failed twice: running the linter but forgetting the
+formatter, and running a locally installed tool older than the one CI installs. Both turned a
+correct change into a red build, so the linters are pinned to a compatible release and the
+whole sequence lives in one target. CI runs the same four checks on Python 3.10 and 3.12.
+
+204 tests, 94% statement coverage.
 
 ## License
 
