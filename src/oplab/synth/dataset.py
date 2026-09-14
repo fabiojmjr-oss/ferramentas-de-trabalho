@@ -12,6 +12,7 @@ from .catalog import generate_catalog
 from .config import SynthConfig
 from .costs import generate_cost_ledger
 from .counts import generate_cycle_counts
+from .deliveries import generate_deliveries
 from .demand import generate_demand
 from .inbound import generate_receipts
 from .outbound import generate_order_lines
@@ -33,6 +34,7 @@ class Dataset:
     layout: pd.DataFrame
     assignment: pd.DataFrame
     cost_ledger: pd.DataFrame
+    deliveries: pd.DataFrame
 
     @property
     def tables(self) -> dict[str, pd.DataFrame]:
@@ -76,7 +78,8 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
 
     Returns:
         A :class:`Dataset` holding the catalogue, demand, order lines, receipts, cycle counts,
-        process measurements, pick-face layout, current slotting assignment and cost ledger.
+        process measurements, pick-face layout, current slotting assignment, cost ledger and
+        delivery stops.
     """
     cfg = config or SynthConfig()
     rng = np.random.default_rng(cfg.seed)
@@ -92,6 +95,7 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
     layout = generate_layout(cfg)
     assignment = generate_assignment(catalog, layout, rng)
     cost_ledger = generate_cost_ledger(cfg, order_lines, catalog, rng)
+    deliveries = generate_deliveries(cfg, cost_ledger, rng)
 
     return Dataset(
         config=cfg,
@@ -104,4 +108,5 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
         layout=layout,
         assignment=assignment,
         cost_ledger=cost_ledger,
+        deliveries=deliveries,
     )

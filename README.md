@@ -5,8 +5,8 @@
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 Logistics indicators, statistical process control, pick-face slotting, cost variance
-decomposition, discrete-event capacity simulation, and the synthetic supply chain data to
-exercise all of it. Python, tested, typed.
+decomposition, discrete-event capacity simulation, vehicle routing, and the synthetic supply
+chain data to exercise all of it. Python, tested, typed.
 
 **[Leia em português →](README.pt-BR.md)**
 
@@ -35,6 +35,7 @@ one silently.
 | `oplab.slotting` | Which items deserve which policy, and what does the layout cost? | [README](src/oplab/slotting/README.md) |
 | `oplab.variance` | Why did cost per order move, and who owns each part of it? | [README](src/oplab/variance/README.md) |
 | `oplab.simulation` | Where is the constraint, and what does relieving it buy? | [README](src/oplab/simulation/README.md) |
+| `oplab.routing` | What does a delivery cost, and which decisions can the model settle? | [README](src/oplab/routing/README.md) |
 
 Four more tools are planned. Build sequence and selection rule in
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
@@ -60,7 +61,7 @@ print(service_sensitivity(dataset.order_lines))  # one order book, four conventi
 
 ---
 
-## Six things it demonstrates
+## Seven things it demonstrates
 
 ### 1. A sixteen-point service spread with no change to the operation
 
@@ -209,6 +210,33 @@ interval, that point estimate would have been reported as a result.
 Details, including why an inbound investment provably cannot move an outbound metric in this
 model, in the [module README](src/oplab/simulation/README.md).
 
+### 7. A model that refuses to answer the question
+
+Routing 74 deliveries from one depot, under four search budgets:
+
+| Search budget | Vehicles | Cost per delivery |
+| --- | --- | --- |
+| 20 solutions | 8 | 53.29 |
+| 120 | 6 | 42.17 |
+| 300 | **5** | **38.50** |
+
+Against a carrier quoting 42.00 per delivery, **the conclusion flips with how hard the solver
+was allowed to look.** A cheap solve says buy the service; a thorough one says run the fleet.
+The fleet size moves with the budget too, from eight vehicles to five — a tender decided on a
+cheap solve would have bought three vans it did not need.
+
+**So the model cannot settle make-or-buy at this price, and saying so is the output.** What it
+does settle, by a margin no assumption threatens: the truck is the wrong vehicle for this
+profile, at 67% more per delivery.
+
+Two more results from the same module. Cost per delivery falls 28% when the same territory
+carries four times the customers — **density, not distance, governs last-mile cost**. And the
+delivery windows cost 2.2% rather than the 8.8% a smaller budget reported, because **an
+under-searched solve exaggerates the cost of every constraint it prices**.
+
+Details, including why a travel-based lower bound on fleet size is not a bound at all, in the
+[module README](src/oplab/routing/README.md).
+
 ---
 
 ## Design principles
@@ -236,6 +264,10 @@ plug line is an allocation with a plug line, and the plug is where disagreements
 **Never report a stochastic point estimate as an answer.** Simulation results carry confidence
 intervals, and a scenario whose interval overlaps the base is reported as indistinguishable
 rather than as a small improvement.
+
+**Refuse the questions the model cannot answer.** A routing cost carries the search time limit
+it was produced under, and where a comparison falls inside that sensitivity the documented
+answer is that the model does not decide it.
 
 **Test against hand calculations.** Control chart limits are checked against `A2`, `D3` and
 `D4` from the published tables on subgroups whose ranges are exact by construction. Service
@@ -274,8 +306,13 @@ Stated plainly, because the gaps matter as much as the coverage:
   across the shift break, and leaves loading, replenishment and travel distance out of scope.
   See the [module README](src/oplab/simulation/README.md); the first assumption in particular
   understates the value of cross-deploying people.
-- There is no forecasting or route optimisation yet. Those are waves 3 and 4 of
-  [`docs/ROADMAP.md`](docs/ROADMAP.md).
+- Routing uses straight-line distance scaled by an assumed circuity factor and a single average
+  speed, one order per stop, one vehicle type per solve, one deterministic day, and no proof of
+  optimality. The scenario *ranking* survives all of that; the absolute costs do not, and the
+  ranking itself can invert at a small search budget. See the
+  [module README](src/oplab/routing/README.md).
+- There is no demand forecasting, multi-site benchmarking, process mining or inventory policy
+  work yet. Those are wave 4 of [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Development
 
@@ -290,8 +327,9 @@ formatter, and running a locally installed tool older than the one CI installs. 
 correct change into a red build, so the linters are pinned to a compatible release and the
 whole sequence lives in one target. CI runs the same four checks on Python 3.10 and 3.12.
 
-273 tests, 95% statement coverage. The suite takes about two minutes, most of it spent
-verifying the simulation figures quoted above - which is the cost of having them under test.
+322 tests, 95% statement coverage. The suite takes about four and a half minutes, most of it
+spent verifying the simulation and routing figures quoted above - which is the cost of having
+them under test rather than merely written down.
 
 ## License
 

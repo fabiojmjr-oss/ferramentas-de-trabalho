@@ -10,6 +10,7 @@ from .config import DEFAULT_SITES, SiteProfile, SynthConfig
 from .costs import generate_cost_ledger, size_band
 from .counts import generate_cycle_counts
 from .dataset import Dataset, generate_dataset
+from .deliveries import generate_deliveries
 from .demand import generate_demand
 from .inbound import generate_receipts
 from .outbound import generate_order_lines
@@ -26,6 +27,7 @@ __all__ = [
     "generate_catalog",
     "generate_cost_ledger",
     "generate_cycle_counts",
+    "generate_deliveries",
     "generate_dataset",
     "generate_demand",
     "generate_layout",

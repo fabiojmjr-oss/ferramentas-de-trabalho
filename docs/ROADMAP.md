@@ -17,7 +17,7 @@ decision-neutral is left out.
 | 3 | ABC-XYZ and slotting | `oplab.slotting` | Which items go where, and what does the current layout cost? | 2 — done |
 | 4 | Variance decomposer | `oplab.variance` | Why did cost per order move, and who owns the delta? | 2 — done |
 | 5 | DC capacity simulation | `oplab.simulation` | Where is the constraint, and what does relieving it buy? | 3 — done |
-| 6 | Route optimiser | `oplab.routing` | What does a delivery cost under each fleet scenario? | 3 |
+| 6 | Route optimiser | `oplab.routing` | What does a delivery cost under each fleet scenario? | 3 — done |
 | 7 | Multi-site benchmark | `oplab.benchmark` | Which site is genuinely underperforming once size and mix are held constant? | 4 |
 | 8 | Process mining | `oplab.mining` | What does the process actually do, as opposed to the flowchart? | 4 |
 | 9 | Forecast baseline | `oplab.forecast` | Does this forecast beat seasonal naive, measured honestly? | 4 |
@@ -63,7 +63,7 @@ Wave 2 is complete.
 ## Wave 3 — the depth piece
 
 Two anchors, built in sequence rather than in parallel. Two projects at 60% completion signal
-worse than one at 100%. The simulation is done; route optimisation is next in this wave.
+worse than one at 100%. Both are complete; wave 3 is closed.
 
 **DC capacity simulation** *(complete — [module README](../src/oplab/simulation/README.md))*.
 Discrete-event model of receiving, put-away, picking and checking, with queues, a shift
@@ -83,9 +83,34 @@ utilisation is work performed over capacity available, both counting open hours 
 held while closed is a separate metric - which for a dock is trailer detention, a real cost that
 no utilisation figure contains.
 
-**Route optimiser.** Vehicle routing with time windows, capacity and multiple depots, with a
-scenario comparator — own fleet against third party, one shift against two, delivery density
-against cost per drop.
+**Route optimiser** *(complete — [module README](../src/oplab/routing/README.md))*. Vehicle
+routing with time windows and capacity on OR-Tools, with a scenario comparator covering own
+fleet against third party, the cost of the delivery windows, and density against cost per drop.
+Multiple depots were dropped from scope: each site routes independently, which is what the data
+supports.
+
+The headline result is a refusal. Against a carrier at 42.00 per delivery, the own fleet costs
+53.29 at a small search budget and 38.50 at a larger one - so the conclusion itself flips with
+how hard the solver looked, and the documented answer is that the model does not settle
+make-or-buy at this price. What it does decide, by a margin no assumption threatens: the truck
+is the wrong vehicle for this profile.
+
+Three mistakes are recorded in the module rather than quietly fixed.
+
+The vehicle count offered to the solver was bounded using service time only, which ignores
+travel; on a territory with a hundred-kilometre radius that reported a feasible day as
+infeasible - the worst kind of bug, because it looks like a finding.
+
+A travel-based lower bound on fleet size turned out not to be a bound at all: it came out above
+the achieved solution, because a route amortises the radius across its stops. The amount by
+which routing beats that figure is exactly the density effect the module measures.
+
+And the search budget was a wall-clock limit, which made results depend on machine load - a
+claim test passed alone and failed inside the full suite. The budget is now a reproducible
+solution count. Fixing it also corrected a published finding: the delivery windows cost 2.2%,
+not the 8.8% the under-searched solve reported, because a heuristic given too little budget
+struggles more with the constrained problem than with the open one and therefore overstates the
+cost of every constraint priced with it.
 
 ## Wave 4 — differentiation
 

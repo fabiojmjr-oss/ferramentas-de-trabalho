@@ -325,6 +325,82 @@ def test_simulation_scenario_table() -> None:
     assert table.loc["+2 inbound docks", "mean"] == pytest.approx(table.loc["base", "mean"])
 
 
+def test_routing_tables(full: Dataset) -> None:
+    """oplab/routing/README.md: the conclusion flips with the search budget, so the model
+    refuses to settle make-or-buy."""
+    from oplab.routing import (
+        TRUCK,
+        VAN,
+        compare_fleets,
+        density_curve,
+        fleet_lower_bounds,
+        one_day,
+        quality_curve,
+        window_cost,
+    )
+
+    problem = one_day(full.deliveries, "CD-SP", "2025-06-11")
+    assert problem.n_stops == 74
+
+    # Only the two valid bounds, and both below the fleet actually needed.
+    bounds = fleet_lower_bounds(problem, VAN)
+    assert set(bounds.index) == {"by_weight", "by_service_time", "binding"}
+    assert bounds["by_weight"] == 3.0
+    assert bounds["by_service_time"] == 2.0
+
+    quality = quality_curve(problem, VAN).set_index("solution_limit")
+    expected = {20: (8, 53.288), 60: (8, 50.760), 120: (6, 42.170), 300: (5, 38.502)}
+    for limit, (vehicles, cost) in expected.items():
+        assert quality.loc[limit, "vehicles_used"] == vehicles
+        assert quality.loc[limit, "cost_per_delivery"] == pytest.approx(cost, abs=5e-3)
+    assert not quality["hit_time_cap"].any(), "a capped run would not be reproducible"
+
+    budget_spread = quality["cost_per_delivery"].max() - quality["cost_per_delivery"].min()
+    assert budget_spread == pytest.approx(14.79, abs=5e-2)
+    # The fleet size, not only the cost, moves with the budget.
+    assert quality.loc[20, "vehicles_used"] - quality.loc[300, "vehicles_used"] == 3
+
+    density = density_curve(problem, VAN, (0.25, 0.5, 1.0)).set_index("stops")
+    assert density.loc[18, "cost_per_delivery"] == pytest.approx(53.218, abs=5e-3)
+    assert density.loc[37, "cost_per_delivery"] == pytest.approx(48.214, abs=5e-3)
+    assert density.loc[74, "cost_per_delivery"] == pytest.approx(38.502, abs=5e-3)
+    assert density["cost_per_delivery"].is_monotonic_decreasing
+    # Four times the density is 28% lower cost per delivery, in the same territory.
+    assert 1 - density.loc[74, "cost_per_delivery"] / density.loc[18, "cost_per_delivery"] == (
+        pytest.approx(0.277, abs=5e-3)
+    )
+
+    windows = window_cost(problem, VAN).set_index("case")
+    assert windows.loc["windows enforced", "cost_per_delivery"] == pytest.approx(38.502, abs=5e-3)
+    assert windows.loc["windows opened", "cost_per_delivery"] == pytest.approx(37.683, abs=5e-3)
+    assert windows.loc["windows enforced", "premium_vs_open"] == pytest.approx(0.022, abs=1e-3)
+    # Under a proper budget the windows cost no extra vehicle. An under-searched solve
+    # reported 8.8% and one extra van, because the heuristic struggles more with the
+    # constrained problem than with the open one - so a cheap solve exaggerates the cost of
+    # every constraint.
+    assert windows.loc["windows enforced", "vehicles_used"] == 5
+    assert windows.loc["windows opened", "vehicles_used"] == 5
+
+    fleets = compare_fleets(
+        problem, {"van": VAN, "truck": TRUCK}, third_party_price_per_delivery=42.0
+    ).set_index("option")
+    assert fleets.loc["van", "cost_per_delivery"] == pytest.approx(38.502, abs=5e-3)
+    assert fleets.loc["truck", "cost_per_delivery"] == pytest.approx(64.213, abs=5e-3)
+
+    # The refusal: the conclusion itself flips with the search budget. A cheap solve says buy,
+    # a thorough one says make, and the gap is a quarter of the budget spread.
+    assert quality.loc[20, "cost_per_delivery"] > 42.0, "a cheap solve favours the carrier"
+    assert quality.loc[300, "cost_per_delivery"] < 42.0, "a thorough one favours the fleet"
+    make_or_buy_gap = 42.0 - float(fleets.loc["van", "cost_per_delivery"])
+    assert make_or_buy_gap == pytest.approx(3.50, abs=5e-2)
+    assert make_or_buy_gap < budget_spread / 3.0
+
+    # What the model does settle, by a margin no assumption threatens.
+    assert fleets.loc["truck", "cost_per_delivery"] / fleets.loc["van", "cost_per_delivery"] == (
+        pytest.approx(1.67, abs=1e-2)
+    )
+
+
 def test_examples_run_without_error() -> None:
     """The three example scripts are part of the deliverable; a broken one is a broken README."""
     import runpy
@@ -334,7 +410,7 @@ def test_examples_run_without_error() -> None:
 
     root = Path(__file__).resolve().parents[1]
     scripts = sorted((root / "examples").glob("*.py"))
-    assert len(scripts) == 6
+    assert len(scripts) == 7
 
     for script in scripts:
         captured, sys.stdout = sys.stdout, StringIO()

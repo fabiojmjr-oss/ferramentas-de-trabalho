@@ -5,8 +5,9 @@
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 Indicadores logísticos, controle estatístico de processo, endereçamento de picking, decomposição
-de variação de custo, simulação de capacidade por eventos discretos e os dados sintéticos de
-cadeia de suprimentos para exercitar tudo isso. Python, com testes e tipagem.
+de variação de custo, simulação de capacidade por eventos discretos, roteirização de veículos e
+os dados sintéticos de cadeia de suprimentos para exercitar tudo isso. Python, com testes e
+tipagem.
 
 **[Read in English →](README.md)**
 
@@ -34,6 +35,7 @@ em silêncio.
 | `oplab.slotting` | Quais itens merecem qual política, e quanto o layout custa? | [README](src/oplab/slotting/README.md) |
 | `oplab.variance` | Por que o custo por pedido mudou, e quem responde por cada parte? | [README](src/oplab/variance/README.md) |
 | `oplab.simulation` | Onde está a restrição, e o que aliviá-la compra? | [README](src/oplab/simulation/README.md) |
+| `oplab.routing` | Quanto custa uma entrega, e quais decisões o modelo consegue fechar? | [README](src/oplab/routing/README.md) |
 
 Mais quatro ferramentas estão planejadas. Sequência e regra de seleção em
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
@@ -59,7 +61,7 @@ print(service_sensitivity(dataset.order_lines))  # uma carteira, quatro convenç
 
 ---
 
-## Seis coisas que isso demonstra
+## Sete coisas que isso demonstra
 
 ### 1. Dezesseis pontos de nível de serviço sem mexer na operação
 
@@ -207,6 +209,33 @@ errado. Sem o intervalo, essa estimativa pontual teria sido reportada como resul
 Detalhes, inclusive por que um investimento em recebimento comprovadamente não pode mover um
 indicador de expedição neste modelo, no [README do módulo](src/oplab/simulation/README.md).
 
+### 7. Um modelo que se recusa a responder a pergunta
+
+Roteirizando 74 entregas de um depósito, sob quatro orçamentos de busca:
+
+| Orçamento de busca | Veículos | Custo por entrega |
+| --- | --- | --- |
+| 20 soluções | 8 | 53,29 |
+| 120 | 6 | 42,17 |
+| 300 | **5** | **38,50** |
+
+Contra uma transportadora cotando R$ 42,00 por entrega, **a conclusão se inverte conforme o
+quanto o solver teve permissão de procurar.** Um solve barato diz terceirize; um minucioso diz
+opere a frota. O tamanho da frota também se move com o orçamento, de oito veículos para cinco —
+uma concorrência decidida com solve barato teria comprado três vans desnecessárias.
+
+**Logo o modelo não decide frota própria versus terceirizada nesse preço, e dizer isso é o
+resultado.** O que ele decide, por margem que nenhuma premissa ameaça: o caminhão é o veículo
+errado para este perfil, a 67% mais por entrega.
+
+Dois outros resultados do mesmo módulo. O custo por entrega cai 28% quando o mesmo território
+carrega quatro vezes mais clientes — **densidade, não distância, governa o custo da última
+milha**. E as janelas de entrega custam 2,2%, não os 8,8% que um orçamento menor reportava,
+porque **um solve com busca insuficiente exagera o custo de toda restrição que ele precifica**.
+
+Detalhes, inclusive por que um limite inferior de frota baseado em deslocamento não é limite
+algum, no [README do módulo](src/oplab/routing/README.md).
+
 ---
 
 ## Princípios de projeto
@@ -236,6 +265,11 @@ discordâncias se escondem.
 **Nunca reportar estimativa pontual estocástica como resposta.** Resultados de simulação vêm com
 intervalo de confiança, e cenário cujo intervalo se sobrepõe ao da base é reportado como
 indistinguível, não como melhoria pequena.
+
+**Recusar as perguntas que o modelo não responde.** Um custo de roteirização carrega o orçamento
+de busca sob o qual foi produzido, e onde a conclusão se inverte dentro dessa faixa a resposta
+documentada é que o modelo não decide. O orçamento é contagem reproduzível de soluções, não
+cronômetro, porque limite de tempo de parede faz a resposta depender da máquina.
 
 **Testar contra cálculo feito à mão.** Os limites das cartas são conferidos contra `A2`, `D3` e
 `D4` das tabelas publicadas, em subgrupos cuja amplitude é exata por construção. Os indicadores
@@ -276,8 +310,13 @@ Ditas com clareza, porque as lacunas importam tanto quanto a cobertura:
   retém recurso durante a parada de turno, e deixa carregamento, reabastecimento e distância
   percorrida fora de escopo. Ver o [README do módulo](src/oplab/simulation/README.md); a
   primeira premissa em especial subestima o valor de realocar pessoal entre as áreas.
-- Ainda não há previsão de demanda nem roteirização. São as ondas 3 e 4 do
-  [`docs/ROADMAP.md`](docs/ROADMAP.md).
+- A roteirização usa distância em linha reta multiplicada por um fator de circuidade presumido e
+  uma velocidade média única, um pedido por parada, um tipo de veículo por solve, um dia
+  determinístico, e sem prova de otimalidade. A *ordenação* de cenários sobrevive a tudo isso; os
+  custos absolutos não, e a própria ordenação pode se inverter com orçamento de busca pequeno.
+  Ver o [README do módulo](src/oplab/routing/README.md).
+- Ainda não há previsão de demanda, benchmarking multiunidade, process mining nem política de
+  estoque. São a onda 4 do [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Desenvolvimento
 
@@ -293,8 +332,9 @@ transformaram uma mudança correta em build vermelho, então os linters estão f
 compatível e a sequência inteira vive em um único alvo. A CI roda as mesmas quatro verificações
 em Python 3.10 e 3.12.
 
-273 testes, 95% de cobertura de statements. A suíte leva cerca de dois minutos, a maior parte
-verificando os números de simulação citados acima — que é o custo de tê-los sob teste.
+322 testes, 95% de cobertura de statements. A suíte leva cerca de quatro minutos e meio, a maior
+parte verificando os números de simulação e roteirização citados acima — que é o custo de tê-los
+sob teste em vez de apenas escritos.
 
 ## Licença
 
