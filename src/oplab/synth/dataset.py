@@ -1,0 +1,94 @@
+"""Assembly of a complete synthetic dataset."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, fields
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from .catalog import generate_catalog
+from .config import SynthConfig
+from .counts import generate_cycle_counts
+from .demand import generate_demand
+from .inbound import generate_receipts
+from .outbound import generate_order_lines
+from .process import generate_subgroups
+
+
+@dataclass(frozen=True)
+class Dataset:
+    """The five tables every example in this repository is built on."""
+
+    config: SynthConfig
+    catalog: pd.DataFrame
+    demand: pd.DataFrame
+    order_lines: pd.DataFrame
+    receipts: pd.DataFrame
+    cycle_counts: pd.DataFrame
+    subgroups: pd.DataFrame
+
+    @property
+    def tables(self) -> dict[str, pd.DataFrame]:
+        """Frames keyed by table name, excluding the configuration."""
+        return {
+            f.name: getattr(self, f.name)
+            for f in fields(self)
+            if f.name != "config" and isinstance(getattr(self, f.name), pd.DataFrame)
+        }
+
+    def summary(self) -> pd.DataFrame:
+        """Row and column counts per table, for a quick sanity check."""
+        return pd.DataFrame(
+            [
+                {"table": name, "rows": len(df), "columns": df.shape[1]}
+                for name, df in self.tables.items()
+            ]
+        )
+
+    def to_csv(self, directory: str | Path) -> dict[str, Path]:
+        """Write every table to ``directory`` as CSV and return the paths written."""
+        target = Path(directory)
+        target.mkdir(parents=True, exist_ok=True)
+        written: dict[str, Path] = {}
+        for name, df in self.tables.items():
+            path = target / f"{name}.csv"
+            df.to_csv(path, index=False)
+            written[name] = path
+        return written
+
+
+def generate_dataset(config: SynthConfig | None = None) -> Dataset:
+    """Generate the full dataset from a single seed.
+
+    One generator instance is threaded through every step, so the whole dataset is
+    reproducible from ``config.seed`` alone: the same seed yields byte-identical tables on
+    any machine with the same library versions.
+
+    Args:
+        config: Generation parameters. Defaults to :class:`SynthConfig`.
+
+    Returns:
+        A :class:`Dataset` holding the catalogue, demand, order lines, receipts, cycle counts
+        and process measurements.
+    """
+    cfg = config or SynthConfig()
+    rng = np.random.default_rng(cfg.seed)
+
+    catalog = generate_catalog(cfg, rng)
+    demand = generate_demand(cfg, catalog, rng)
+    order_lines = generate_order_lines(cfg, demand, rng)
+    receipts = generate_receipts(cfg, rng)
+    cycle_counts = generate_cycle_counts(cfg, catalog, rng)
+    subgroups = generate_subgroups(rng)
+
+    return Dataset(
+        config=cfg,
+        catalog=catalog,
+        demand=demand,
+        order_lines=order_lines,
+        receipts=receipts,
+        cycle_counts=cycle_counts,
+        subgroups=subgroups,
+    )
