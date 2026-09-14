@@ -37,14 +37,10 @@ from statistics import NormalDist
 import numpy as np
 import pandas as pd
 
+from .._pandas import as_float
 from .constants import MAX_SUBGROUP, MIN_SUBGROUP, d2
 
 _NORMAL = NormalDist()
-
-
-def _scalar(value: object) -> float:
-    """Coerce a pandas reduction result to a plain float."""
-    return float(np.asarray(value, dtype=float).item())
 
 
 @dataclass(frozen=True)
@@ -247,8 +243,8 @@ def capability(
         cpm=cpm,
         expected_ppm=expected_ppm,
         sigma_level=sigma_level,
-        skewness=_scalar(series.skew()),
-        excess_kurtosis=_scalar(series.kurtosis()),
+        skewness=as_float(series.skew()),
+        excess_kurtosis=as_float(series.kurtosis()),
     )
 
 

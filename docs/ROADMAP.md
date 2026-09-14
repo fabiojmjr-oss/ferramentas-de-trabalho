@@ -16,7 +16,7 @@ decision-neutral is left out.
 | 2 | SPC toolkit | `oplab.spc` | Did the process change, and is it capable? | 1 — done |
 | 3 | ABC-XYZ and slotting | `oplab.slotting` | Which items go where, and what does the current layout cost? | 2 — done |
 | 4 | Variance decomposer | `oplab.variance` | Why did cost per order move, and who owns the delta? | 2 — done |
-| 5 | DC capacity simulation | `oplab.simulation` | Where is the constraint, and what does relieving it buy? | 3 |
+| 5 | DC capacity simulation | `oplab.simulation` | Where is the constraint, and what does relieving it buy? | 3 — done |
 | 6 | Route optimiser | `oplab.routing` | What does a delivery cost under each fleet scenario? | 3 |
 | 7 | Multi-site benchmark | `oplab.benchmark` | Which site is genuinely underperforming once size and mix are held constant? | 4 |
 | 8 | Process mining | `oplab.mining` | What does the process actually do, as opposed to the flowchart? | 4 |
@@ -63,12 +63,25 @@ Wave 2 is complete.
 ## Wave 3 — the depth piece
 
 Two anchors, built in sequence rather than in parallel. Two projects at 60% completion signal
-worse than one at 100%.
+worse than one at 100%. The simulation is done; route optimisation is next in this wave.
 
-**DC capacity simulation.** Discrete-event model of receiving → put-away → picking →
-checking → dispatch, with queues, shifts and absenteeism. Reports resource utilisation, vehicle
-dwell time and the moving constraint. The point is the question a static capacity spreadsheet
-cannot answer: more docks, more pickers, or an extra shift?
+**DC capacity simulation** *(complete — [module README](../src/oplab/simulation/README.md))*.
+Discrete-event model of receiving, put-away, picking and checking, with queues, a shift
+calendar and replicated runs reporting confidence intervals.
+
+The answer to "more docks, more pickers, or an extra shift?" turned out to be "none of those".
+The spreadsheet's utilisation figures are correct and decide nothing: picking at 78% causes
+nearly three times the waiting of checking at 95%, because orders are released in two waves.
+Levelling the release recovers 2.8 times what the best paid option does and costs nothing, and
+four more pickers - the intuitive move - cannot be shown to do anything at all. That last
+finding only exists because scenarios are compared on intervals rather than point estimates.
+
+Building it also produced an instructive bug. Utilisation came out above 100%, which is
+impossible, because a task interrupted by the shift break keeps its resource overnight and that
+held time was being divided by open hours only. The fix was conceptual rather than arithmetic:
+utilisation is work performed over capacity available, both counting open hours only, and time
+held while closed is a separate metric - which for a dock is trailer detention, a real cost that
+no utilisation figure contains.
 
 **Route optimiser.** Vehicle routing with time windows, capacity and multiple depots, with a
 scenario comparator — own fleet against third party, one shift against two, delivery density

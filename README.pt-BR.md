@@ -5,8 +5,8 @@
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 Indicadores logísticos, controle estatístico de processo, endereçamento de picking, decomposição
-de variação de custo e os dados sintéticos de cadeia de suprimentos para exercitar tudo isso.
-Python, com testes e tipagem.
+de variação de custo, simulação de capacidade por eventos discretos e os dados sintéticos de
+cadeia de suprimentos para exercitar tudo isso. Python, com testes e tipagem.
 
 **[Read in English →](README.md)**
 
@@ -33,8 +33,9 @@ em silêncio.
 | `oplab.spc` | O processo mudou, e ele é capaz de atender à especificação? | — |
 | `oplab.slotting` | Quais itens merecem qual política, e quanto o layout custa? | [README](src/oplab/slotting/README.md) |
 | `oplab.variance` | Por que o custo por pedido mudou, e quem responde por cada parte? | [README](src/oplab/variance/README.md) |
+| `oplab.simulation` | Onde está a restrição, e o que aliviá-la compra? | [README](src/oplab/simulation/README.md) |
 
-Mais cinco ferramentas estão planejadas. Sequência e regra de seleção em
+Mais quatro ferramentas estão planejadas. Sequência e regra de seleção em
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Instalação
@@ -58,7 +59,7 @@ print(service_sensitivity(dataset.order_lines))  # uma carteira, quatro convenç
 
 ---
 
-## Cinco coisas que isso demonstra
+## Seis coisas que isso demonstra
 
 ### 1. Dezesseis pontos de nível de serviço sem mexer na operação
 
@@ -173,6 +174,39 @@ se mover por volume: a ponte tem exatamente dois termos por construção, então
 pedido subiu, mas o volume cresceu"* não é explicação. Detalhes, inclusive a ressalva de
 alavancagem operacional que qualifica isso, no [README do módulo](src/oplab/variance/README.md).
 
+### 6. A planilha de capacidade está certa, e ainda aponta a decisão errada
+
+Utilização é conservada, então dividir trabalho médio por capacidade média a calcula
+corretamente. Os números simulados batem com a planilha dentro de um ponto. E não decidem nada:
+
+| Recurso | Utilização | Espera total causada |
+| --- | --- | --- |
+| Separação (18 pessoas) | 77,9% | **26.425 h** |
+| Conferência (5 postos) | 95,3% | 9.622 h |
+
+**Utilização não ordena nada.** A separação está em carga folgada e causa quase três vezes a
+espera do recurso a 95%, porque os pedidos são liberados em duas ondas e cada pedido entra na
+fila atrás de meio dia de trabalho no instante em que chega. Isso é política de liberação, não
+falta de capacidade, e nenhum índice de utilização separa os dois.
+
+O que isso faz com o caso de investimento, em seis replicações a 95% de confiança:
+
+| Cenário | Tempo de ciclo | Variação | Distinguível |
+| --- | --- | --- | --- |
+| **Liberar em 8 ondas em vez de 2** | 0,82 h | **−61,7%** | Sim |
+| +2 postos de conferência | 1,68 h | −22,0% | Sim |
+| Turno de 8 h para 10 h | 2,02 h | −6,1% | Sim |
+| +2 docas de recebimento | 2,15 h | 0,0% | **Não** |
+| +4 separadores | 2,17 h | +0,7% | **Não** |
+
+A mudança operacional gratuita recupera 2,8 vezes o que a melhor opção paga recupera. E quatro
+separadores a mais — o movimento intuitivo, dirigido à maior fila e à maior equipe — **não
+demonstram efeito algum**: o intervalo se sobrepõe ao da base, e o ponto se moveu para o lado
+errado. Sem o intervalo, essa estimativa pontual teria sido reportada como resultado.
+
+Detalhes, inclusive por que um investimento em recebimento comprovadamente não pode mover um
+indicador de expedição neste modelo, no [README do módulo](src/oplab/simulation/README.md).
+
 ---
 
 ## Princípios de projeto
@@ -198,6 +232,10 @@ comparação em silêncio.
 `waterfall()` levanta erro em vez de desenhar barras que não fecham no total final.
 Decomposição com linha de ajuste é rateio com linha de ajuste, e é no ajuste que as
 discordâncias se escondem.
+
+**Nunca reportar estimativa pontual estocástica como resposta.** Resultados de simulação vêm com
+intervalo de confiança, e cenário cujo intervalo se sobrepõe ao da base é reportado como
+indistinguível, não como melhoria pequena.
 
 **Testar contra cálculo feito à mão.** Os limites das cartas são conferidos contra `A2`, `D3` e
 `D4` das tabelas publicadas, em subgrupos cuja amplitude é exata por construção. Os indicadores
@@ -234,7 +272,11 @@ Ditas com clareza, porque as lacunas importam tanto quanto a cobertura:
   pela qual você não segmenta — e não separa custo fixo de variável, então alavancagem
   operacional se esconde no efeito taxa. Também compara dois períodos sem testar se o movimento
   excede a variação normal; carte com `oplab.spc` antes.
-- Ainda não há previsão de demanda, otimização ou simulação. São as ondas 3 e 4 do
+- A simulação de capacidade mantém mão de obra de recebimento e expedição em pools separados,
+  retém recurso durante a parada de turno, e deixa carregamento, reabastecimento e distância
+  percorrida fora de escopo. Ver o [README do módulo](src/oplab/simulation/README.md); a
+  primeira premissa em especial subestima o valor de realocar pessoal entre as áreas.
+- Ainda não há previsão de demanda nem roteirização. São as ondas 3 e 4 do
   [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Desenvolvimento
@@ -251,7 +293,8 @@ transformaram uma mudança correta em build vermelho, então os linters estão f
 compatível e a sequência inteira vive em um único alvo. A CI roda as mesmas quatro verificações
 em Python 3.10 e 3.12.
 
-204 testes, 94% de cobertura de statements.
+273 testes, 95% de cobertura de statements. A suíte leva cerca de dois minutos, a maior parte
+verificando os números de simulação citados acima — que é o custo de tê-los sob teste.
 
 ## Licença
 

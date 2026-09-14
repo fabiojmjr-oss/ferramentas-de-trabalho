@@ -5,7 +5,8 @@
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 Logistics indicators, statistical process control, pick-face slotting, cost variance
-decomposition, and the synthetic supply chain data to exercise all of it. Python, tested, typed.
+decomposition, discrete-event capacity simulation, and the synthetic supply chain data to
+exercise all of it. Python, tested, typed.
 
 **[Leia em português →](README.pt-BR.md)**
 
@@ -33,8 +34,9 @@ one silently.
 | `oplab.spc` | Did the process change, and is it capable of the specification? | — |
 | `oplab.slotting` | Which items deserve which policy, and what does the layout cost? | [README](src/oplab/slotting/README.md) |
 | `oplab.variance` | Why did cost per order move, and who owns each part of it? | [README](src/oplab/variance/README.md) |
+| `oplab.simulation` | Where is the constraint, and what does relieving it buy? | [README](src/oplab/simulation/README.md) |
 
-Five more tools are planned. Build sequence and selection rule in
+Four more tools are planned. Build sequence and selection rule in
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Install
@@ -58,7 +60,7 @@ print(service_sensitivity(dataset.order_lines))  # one order book, four conventi
 
 ---
 
-## Five things it demonstrates
+## Six things it demonstrates
 
 ### 1. A sixteen-point service spread with no change to the operation
 
@@ -174,6 +176,39 @@ through volume at all: the bridge has exactly two terms by construction, so *"co
 rose but volume grew"* is not an explanation. Details, including the operating-leverage caveat
 that qualifies it, in the [module README](src/oplab/variance/README.md).
 
+### 6. The capacity spreadsheet is right, and still points at the wrong decision
+
+Utilisation is conserved, so dividing mean work by mean capacity computes it correctly. The
+simulated figures match the spreadsheet to within a point. And they decide nothing:
+
+| Resource | Utilisation | Total waiting caused |
+| --- | --- | --- |
+| Picking (18 people) | 77.9% | **26,425 h** |
+| Checking (5 stations) | 95.3% | 9,622 h |
+
+**Utilisation ranks nothing.** Picking sits at a comfortable load and causes nearly three times
+the waiting of the resource at 95%, because orders are released in two waves and every order
+queues behind half a day's work the moment it arrives. That is a release policy, not a capacity
+shortfall, and no utilisation figure separates the two.
+
+What that does to the investment case, over six replications at 95% confidence:
+
+| Scenario | Cycle time | Change | Distinguishable |
+| --- | --- | --- | --- |
+| **Release in 8 waves instead of 2** | 0.82 h | **−61.7%** | Yes |
+| +2 checking stations | 1.68 h | −22.0% | Yes |
+| Shift 8 h to 10 h | 2.02 h | −6.1% | Yes |
+| +2 inbound doors | 2.15 h | 0.0% | **No** |
+| +4 pickers | 2.17 h | +0.7% | **No** |
+
+The free operational change recovers 2.8 times what the best paid option does. And four more
+pickers — the intuitive move, aimed at the longest queue and the largest team — **cannot be
+shown to do anything**: its interval overlaps the base, and it moved the wrong way. Without the
+interval, that point estimate would have been reported as a result.
+
+Details, including why an inbound investment provably cannot move an outbound metric in this
+model, in the [module README](src/oplab/simulation/README.md).
+
 ---
 
 ## Design principles
@@ -197,6 +232,10 @@ comparison.
 **Reconcile exactly or fail.** Variance effects sum to the movement with no residual, and
 `waterfall()` raises rather than draw bars that miss the closing total. A decomposition with a
 plug line is an allocation with a plug line, and the plug is where disagreements hide.
+
+**Never report a stochastic point estimate as an answer.** Simulation results carry confidence
+intervals, and a scenario whose interval overlaps the base is reported as indistinguishable
+rather than as a small improvement.
 
 **Test against hand calculations.** Control chart limits are checked against `A2`, `D3` and
 `D4` from the published tables on subgroups whose ranges are exact by construction. Service
@@ -231,7 +270,11 @@ Stated plainly, because the gaps matter as much as the coverage:
   dimension you do not segment by — and it does not split fixed from variable cost, so
   operating leverage hides inside the rate effect. It also compares two periods with no test of
   whether the movement exceeds normal variation; chart it with `oplab.spc` first.
-- There is no forecasting, optimisation or simulation yet. Those are waves 3 and 4 of
+- The capacity simulation keeps inbound and outbound labour in separate pools, holds a resource
+  across the shift break, and leaves loading, replenishment and travel distance out of scope.
+  See the [module README](src/oplab/simulation/README.md); the first assumption in particular
+  understates the value of cross-deploying people.
+- There is no forecasting or route optimisation yet. Those are waves 3 and 4 of
   [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Development
@@ -247,7 +290,8 @@ formatter, and running a locally installed tool older than the one CI installs. 
 correct change into a red build, so the linters are pinned to a compatible release and the
 whole sequence lives in one target. CI runs the same four checks on Python 3.10 and 3.12.
 
-204 tests, 94% statement coverage.
+273 tests, 95% statement coverage. The suite takes about two minutes, most of it spent
+verifying the simulation figures quoted above - which is the cost of having them under test.
 
 ## License
 

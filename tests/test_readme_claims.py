@@ -255,6 +255,76 @@ def test_variance_attribution_table(full: Dataset) -> None:
     assert abs(without_channel.reconciliation_error) < 1e-9
 
 
+def test_simulation_capacity_review() -> None:
+    """oplab/simulation/README.md: the spreadsheet is right about utilisation and still wrong."""
+    from oplab.simulation import SimConfig, run_once
+
+    result = run_once(SimConfig())
+    review = result.capacity_review().set_index("resource")
+
+    expected = {
+        "inbound_dock": (0.612, 0.616, 153.0),
+        "unloading": (0.612, 0.616, 0.0),
+        "putaway": (0.467, 0.467, 1.0),
+        "picking": (0.783, 0.779, 26_425.0),
+        "checking": (0.960, 0.953, 9_622.0),
+    }
+    for resource, (static, simulated, total_wait) in expected.items():
+        row = review.loc[resource]
+        assert row["static_utilisation"] == pytest.approx(static, abs=1e-3)
+        assert row["utilisation"] == pytest.approx(simulated, abs=1e-3)
+        assert row["total_wait_h"] == pytest.approx(total_wait, abs=1.0)
+
+    # The headline: the busier resource is not the one the operation waits on.
+    assert review.loc["picking", "utilisation"] < review.loc["checking", "utilisation"]
+    assert review.loc["picking", "total_wait_h"] > 2.5 * review.loc["checking", "total_wait_h"]
+    assert result.bottleneck()["resource"] == "picking"
+
+    # Detention: docks read as ample and still hold trailers overnight.
+    assert review.loc["inbound_dock", "utilisation"] == pytest.approx(0.616, abs=1e-3)
+    assert review.loc["inbound_dock", "held_while_closed_h"] == pytest.approx(768.0, abs=1.0)
+
+
+def test_simulation_scenario_table() -> None:
+    """oplab/simulation/README.md: the free change beats every capital option by three times."""
+    from oplab.simulation import SimConfig, compare_scenarios
+
+    table = compare_scenarios(
+        SimConfig(),
+        {
+            "+4 pickers": {"pickers": 22},
+            "+2 checkers": {"checkers": 7},
+            "+2 inbound docks": {"inbound_docks": 6},
+            "shift 8h to 10h": {"shift_hours": 10.0},
+            "release in 8 waves": {"release_waves": 8},
+        },
+        metric="order_cycle_mean_h",
+        replications=6,
+    ).set_index("scenario")
+
+    expected = {
+        "release in 8 waves": (0.824, -0.617, True),
+        "+2 checkers": (1.678, -0.220, True),
+        "shift 8h to 10h": (2.021, -0.061, True),
+        "base": (2.152, 0.000, False),
+        "+2 inbound docks": (2.152, 0.000, False),
+        "+4 pickers": (2.166, 0.007, False),
+    }
+    for scenario, (mean, change, distinguishable) in expected.items():
+        row = table.loc[scenario]
+        assert row["mean"] == pytest.approx(mean, abs=5e-3)
+        assert row["change_vs_base"] == pytest.approx(change, abs=1e-3)
+        assert bool(row["distinguishable"]) is distinguishable
+
+    # The free change recovers nearly three times what the best paid option does.
+    waves = -table.loc["release in 8 waves", "change_vs_base"]
+    checkers = -table.loc["+2 checkers", "change_vs_base"]
+    assert waves / checkers == pytest.approx(2.8, abs=0.1)
+
+    # An inbound investment provably cannot move an outbound metric in this model.
+    assert table.loc["+2 inbound docks", "mean"] == pytest.approx(table.loc["base", "mean"])
+
+
 def test_examples_run_without_error() -> None:
     """The three example scripts are part of the deliverable; a broken one is a broken README."""
     import runpy
@@ -264,7 +334,7 @@ def test_examples_run_without_error() -> None:
 
     root = Path(__file__).resolve().parents[1]
     scripts = sorted((root / "examples").glob("*.py"))
-    assert len(scripts) == 5
+    assert len(scripts) == 6
 
     for script in scripts:
         captured, sys.stdout = sys.stdout, StringIO()
