@@ -14,7 +14,7 @@ decision-neutral is left out.
 | 0 | Synthetic data generator | `oplab.synth` | What do I test against without exposing a real operation? | 1 — done |
 | 1 | KPI engine | `oplab.kpi` | What is the service level, and how much of it is definition? | 1 — done |
 | 2 | SPC toolkit | `oplab.spc` | Did the process change, and is it capable? | 1 — done |
-| 3 | ABC-XYZ and slotting | `oplab.slotting` | Which items go where, and what does the current layout cost? | 2 |
+| 3 | ABC-XYZ and slotting | `oplab.slotting` | Which items go where, and what does the current layout cost? | 2 — done |
 | 4 | Variance decomposer | `oplab.variance` | Why did cost per order move, and who owns the delta? | 2 |
 | 5 | DC capacity simulation | `oplab.simulation` | Where is the constraint, and what does relieving it buy? | 3 |
 | 6 | Route optimiser | `oplab.routing` | What does a delivery cost under each fleet scenario? | 3 |
@@ -33,11 +33,18 @@ OTIF.
 
 ## Wave 2 — visible results
 
-**ABC-XYZ and slotting.** ABC by value crossed with XYZ by demand variability (coefficient of
-variation), producing a 3×3 matrix with a stocking policy per cell. Then a re-slotting
-heuristic on cube-per-order index, reporting estimated change in picker travel distance. The
-estimate is the deliverable, not the reordering: a slotting proposal without a before-and-after
-number cannot be funded.
+**ABC-XYZ and slotting** *(complete — [module README](../src/oplab/slotting/README.md))*.
+Delivered as planned, with one result that came out against expectation and was kept: three
+sensible ranking rules all recover about two thirds of the travel, and the spread between them
+is 1.7 points, so the fundable decision is whether to re-slot rather than which optimiser to
+buy. The cube-per-order index finished last, which is correct under one-face-per-SKU with
+uniform capacity, and the module explains the condition under which it wins instead.
+
+Building it also exposed a design flaw in the generator worth recording: demand volatility had
+been tied to the slow-moving tail, so every erratic item was low value by construction and an
+ABC-XYZ analysis could never produce an AZ cell. Volatility is now drawn independently of
+volume, via a per-SKU gamma shock held across the week. Fixing it moved every published figure,
+which the README claim tests caught immediately - the reason those tests exist.
 
 **Variance decomposer.** Price-volume-mix decomposition of a cost or revenue movement, with a
 driver tree and an automated Pareto identifying which site, SKU or lane explains the delta.
