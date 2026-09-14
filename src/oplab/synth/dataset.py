@@ -10,6 +10,7 @@ import pandas as pd
 
 from .catalog import generate_catalog
 from .config import SynthConfig
+from .costs import generate_cost_ledger
 from .counts import generate_cycle_counts
 from .demand import generate_demand
 from .inbound import generate_receipts
@@ -31,6 +32,7 @@ class Dataset:
     subgroups: pd.DataFrame
     layout: pd.DataFrame
     assignment: pd.DataFrame
+    cost_ledger: pd.DataFrame
 
     @property
     def tables(self) -> dict[str, pd.DataFrame]:
@@ -74,7 +76,7 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
 
     Returns:
         A :class:`Dataset` holding the catalogue, demand, order lines, receipts, cycle counts,
-        process measurements, pick-face layout and current slotting assignment.
+        process measurements, pick-face layout, current slotting assignment and cost ledger.
     """
     cfg = config or SynthConfig()
     rng = np.random.default_rng(cfg.seed)
@@ -89,6 +91,7 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
     # stream leaves every earlier table byte-identical, so published figures keep reproducing.
     layout = generate_layout(cfg)
     assignment = generate_assignment(catalog, layout, rng)
+    cost_ledger = generate_cost_ledger(cfg, order_lines, catalog, rng)
 
     return Dataset(
         config=cfg,
@@ -100,4 +103,5 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
         subgroups=subgroups,
         layout=layout,
         assignment=assignment,
+        cost_ledger=cost_ledger,
     )

@@ -39,6 +39,7 @@ def test_every_table_is_populated(dataset) -> None:  # type: ignore[no-untyped-d
         "subgroups",
         "layout",
         "assignment",
+        "cost_ledger",
     }
 
 
