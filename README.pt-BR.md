@@ -4,8 +4,9 @@
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-Indicadores logísticos, controle estatístico de processo, endereçamento de picking e os dados
-sintéticos de cadeia de suprimentos para exercitar tudo isso. Python, com testes e tipagem.
+Indicadores logísticos, controle estatístico de processo, endereçamento de picking, decomposição
+de variação de custo e os dados sintéticos de cadeia de suprimentos para exercitar tudo isso.
+Python, com testes e tipagem.
 
 **[Read in English →](README.md)**
 
@@ -31,8 +32,9 @@ em silêncio.
 | `oplab.kpi` | Qual é o nível de serviço, e quanto dele é definição? | — |
 | `oplab.spc` | O processo mudou, e ele é capaz de atender à especificação? | — |
 | `oplab.slotting` | Quais itens merecem qual política, e quanto o layout custa? | [README](src/oplab/slotting/README.md) |
+| `oplab.variance` | Por que o custo por pedido mudou, e quem responde por cada parte? | [README](src/oplab/variance/README.md) |
 
-Mais seis ferramentas estão planejadas. Sequência e regra de seleção em
+Mais cinco ferramentas estão planejadas. Sequência e regra de seleção em
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Instalação
@@ -50,13 +52,13 @@ pytest
 from oplab.kpi import service_sensitivity
 from oplab.synth import generate_dataset
 
-dataset = generate_dataset()                      # reprodutível a partir da semente
-print(service_sensitivity(dataset.order_lines))   # uma carteira, quatro convenções
+dataset = generate_dataset()  # reprodutível a partir da semente
+print(service_sensitivity(dataset.order_lines))  # uma carteira, quatro convenções
 ```
 
 ---
 
-## Quatro coisas que isso demonstra
+## Cinco coisas que isso demonstra
 
 ### 1. Dezesseis pontos de nível de serviço sem mexer na operação
 
@@ -147,6 +149,30 @@ A classificação por trás disso rende o próprio achado: 18 de 87 itens classe
 e carregam 19,1% do valor da classe A. Um exercício só de ABC entrega a todos eles a política
 desenhada para demanda previsível, e é daí que vêm as falhas de serviço.
 
+### 5. O mesmo movimento de custo, atribuído de duas formas diferentes
+
+O custo por pedido subiu 20,7% no ano no razão embutido. A decomposição é exata nos dois casos,
+e a segmentação decide a resposta:
+
+| Efeito | Segmentado por unidade e tamanho | Com canal adicionado |
+| --- | --- | --- |
+| Taxa | **+15,61 (99,1%)** | +11,67 (74,1%) |
+| Mix | +0,14 (0,9%) | **+4,08 (25,9%)** |
+| Total | +15,75 | +15,75 |
+
+O movimento é idêntico. A atribuição não é. Omita a dimensão canal e 99% da alta lê como
+operacional; inclua-a e um quarto é mix, porque a participação do canal direto ao consumidor
+cresceu e uma entrega residencial custa quase o dobro por parada que uma entrega em loja.
+
+**Uma dimensão omitida não desaparece. Ela reaparece dentro do efeito taxa e é atribuída a quem
+responde pela taxa** — e é invisível, porque a aritmética fecha em 2,8e-14 nos dois casos.
+
+Duas outras coisas saem do mesmo módulo. O custo total subiu 28,1%, dos quais 22% foram volume
+— o mesmo negócio ficou maior, o que não é problema de custo. E uma métrica por unidade não pode
+se mover por volume: a ponte tem exatamente dois termos por construção, então *"o custo por
+pedido subiu, mas o volume cresceu"* não é explicação. Detalhes, inclusive a ressalva de
+alavancagem operacional que qualifica isso, no [README do módulo](src/oplab/variance/README.md).
+
 ---
 
 ## Princípios de projeto
@@ -167,6 +193,11 @@ de estoque, Cpk ao lado de Ppk. A diferença entre elas costuma ser o achado.
 **Reportar o resultado que contraria o discurso.** O índice cube-per-order perde para
 popularidade simples aqui, e o módulo diz isso e explica por quê, em vez de descartar a
 comparação em silêncio.
+
+**Fechar exatamente ou falhar.** Os efeitos de variação somam ao movimento sem resíduo, e
+`waterfall()` levanta erro em vez de desenhar barras que não fecham no total final.
+Decomposição com linha de ajuste é rateio com linha de ajuste, e é no ajuste que as
+discordâncias se escondem.
 
 **Testar contra cálculo feito à mão.** Os limites das cartas são conferidos contra `A2`, `D3` e
 `D4` das tabelas publicadas, em subgrupos cuja amplitude é exata por construção. Os indicadores
@@ -199,6 +230,10 @@ Ditas com clareza, porque as lacunas importam tanto quanto a cobertura:
 - Cartas por atributo pressupõem ensaios independentes. `overdispersion_ratio` detecta a
   violação, mas a biblioteca ainda não oferece carta p′ de Laney nem outra alternativa robusta
   a superdispersão.
+- A decomposição de variação é tão boa quanto sua segmentação — mix é invisível em dimensão
+  pela qual você não segmenta — e não separa custo fixo de variável, então alavancagem
+  operacional se esconde no efeito taxa. Também compara dois períodos sem testar se o movimento
+  excede a variação normal; carte com `oplab.spc` antes.
 - Ainda não há previsão de demanda, otimização ou simulação. São as ondas 3 e 4 do
   [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -207,7 +242,7 @@ Ditas com clareza, porque as lacunas importam tanto quanto a cobertura:
 ```bash
 ruff check . && ruff format --check .   # lint e formatação
 mypy                                    # verificação de tipos
-pytest --cov                            # 173 testes, 93% de cobertura de statements
+pytest --cov                            # 204 testes, 94% de cobertura de statements
 ```
 
 A CI roda os quatro em Python 3.10 e 3.12.

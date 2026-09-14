@@ -15,7 +15,7 @@ decision-neutral is left out.
 | 1 | KPI engine | `oplab.kpi` | What is the service level, and how much of it is definition? | 1 — done |
 | 2 | SPC toolkit | `oplab.spc` | Did the process change, and is it capable? | 1 — done |
 | 3 | ABC-XYZ and slotting | `oplab.slotting` | Which items go where, and what does the current layout cost? | 2 — done |
-| 4 | Variance decomposer | `oplab.variance` | Why did cost per order move, and who owns the delta? | 2 |
+| 4 | Variance decomposer | `oplab.variance` | Why did cost per order move, and who owns the delta? | 2 — done |
 | 5 | DC capacity simulation | `oplab.simulation` | Where is the constraint, and what does relieving it buy? | 3 |
 | 6 | Route optimiser | `oplab.routing` | What does a delivery cost under each fleet scenario? | 3 |
 | 7 | Multi-site benchmark | `oplab.benchmark` | Which site is genuinely underperforming once size and mix are held constant? | 4 |
@@ -46,10 +46,19 @@ ABC-XYZ analysis could never produce an AZ cell. Volatility is now drawn indepen
 volume, via a per-SKU gamma shock held across the week. Fixing it moved every published figure,
 which the README claim tests caught immediately - the reason those tests exist.
 
-**Variance decomposer.** Price-volume-mix decomposition of a cost or revenue movement, with a
-driver tree and an automated Pareto identifying which site, SKU or lane explains the delta.
-Output is a waterfall. This is the tool that turns an hour of guessing in a performance review
-into ten minutes of reading.
+**Variance decomposer** *(complete — [module README](../src/oplab/variance/README.md))*.
+Price-volume-mix on totals, a two-term exact bridge on per-unit metrics, an absolute-contribution
+Pareto and a waterfall. Both decompositions reconcile with no residual, which is asserted rather
+than assumed.
+
+The finding it produced was not the one planned. Cost per order rose 20.7%, and the split
+between "operational" and "commercial" depends entirely on the segmentation: omitting the
+channel dimension reports 99% of the rise as rate, and adding it moves a quarter of it to mix.
+An omitted dimension does not vanish - it reappears inside the rate effect and is charged to
+whoever owns the rate, invisibly, because the arithmetic reconciles either way. The module leads
+with that warning rather than with the formulas.
+
+Wave 2 is complete.
 
 ## Wave 3 — the depth piece
 

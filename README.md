@@ -4,8 +4,8 @@
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-Logistics indicators, statistical process control, pick-face slotting, and the synthetic supply
-chain data to exercise all of it. Python, tested, typed.
+Logistics indicators, statistical process control, pick-face slotting, cost variance
+decomposition, and the synthetic supply chain data to exercise all of it. Python, tested, typed.
 
 **[Leia em português →](README.pt-BR.md)**
 
@@ -32,8 +32,9 @@ one silently.
 | `oplab.kpi` | What is the service level, and how much of it is definition? | — |
 | `oplab.spc` | Did the process change, and is it capable of the specification? | — |
 | `oplab.slotting` | Which items deserve which policy, and what does the layout cost? | [README](src/oplab/slotting/README.md) |
+| `oplab.variance` | Why did cost per order move, and who owns each part of it? | [README](src/oplab/variance/README.md) |
 
-Six more tools are planned. Build sequence and selection rule in
+Five more tools are planned. Build sequence and selection rule in
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Install
@@ -51,13 +52,13 @@ pytest
 from oplab.kpi import service_sensitivity
 from oplab.synth import generate_dataset
 
-dataset = generate_dataset()                      # reproducible from the seed alone
-print(service_sensitivity(dataset.order_lines))   # one order book, four conventions
+dataset = generate_dataset()  # reproducible from the seed alone
+print(service_sensitivity(dataset.order_lines))  # one order book, four conventions
 ```
 
 ---
 
-## Four things it demonstrates
+## Five things it demonstrates
 
 ### 1. A sixteen-point service spread with no change to the operation
 
@@ -148,6 +149,31 @@ The classification behind it earns its own finding: 18 of 87 class A items are n
 they carry 19.1% of class A value. An ABC-only exercise hands all of them the policy designed
 for predictable demand, and that is where the service failures come from.
 
+### 5. The same cost movement, attributed two different ways
+
+Cost per order rose 20.7% over the year on the bundled ledger. The decomposition is exact
+either way, and the segmentation decides the answer:
+
+| Effect | Segmented by site and order size | With channel added |
+| --- | --- | --- |
+| Rate | **+15.61 (99.1%)** | +11.67 (74.1%) |
+| Mix | +0.14 (0.9%) | **+4.08 (25.9%)** |
+| Total | +15.75 | +15.75 |
+
+The movement is identical. The attribution is not. Omit the channel dimension and 99% of the
+rise reads as operational; add it and a quarter is mix, because the direct-to-consumer share
+grew and a home delivery costs nearly twice as much per stop as a store delivery.
+
+**An omitted dimension does not disappear. It reappears inside the rate effect and is
+attributed to whoever owns the rate** — and it is invisible, because the arithmetic reconciles
+to 2.8e-14 either way.
+
+Two more things fall out of the same module. Total cost rose 28.1%, of which 22% was volume —
+the same business got bigger, which is not a cost problem. And a per-unit metric cannot move
+through volume at all: the bridge has exactly two terms by construction, so *"cost per order
+rose but volume grew"* is not an explanation. Details, including the operating-leverage caveat
+that qualifies it, in the [module README](src/oplab/variance/README.md).
+
 ---
 
 ## Design principles
@@ -167,6 +193,10 @@ definitions, Cpk beside Ppk. The gap between them is usually the finding.
 **Report the result that contradicts the pitch.** The cube-per-order index loses to plain
 popularity here, and the module says so and explains why, rather than quietly dropping the
 comparison.
+
+**Reconcile exactly or fail.** Variance effects sum to the movement with no residual, and
+`waterfall()` raises rather than draw bars that miss the closing total. A decomposition with a
+plug line is an allocation with a plug line, and the plug is where disagreements hide.
 
 **Test against hand calculations.** Control chart limits are checked against `A2`, `D3` and
 `D4` from the published tables on subgroups whose ranges are exact by construction. Service
@@ -197,6 +227,10 @@ Stated plainly, because the gaps matter as much as the coverage:
   percentage change is quotable and the metres are not.
 - Attribute charts assume independent trials. `overdispersion_ratio` detects the violation but
   the library does not yet offer a Laney p′ chart or another overdispersion-robust alternative.
+- Variance decomposition is only as good as its segmentation — mix is invisible along a
+  dimension you do not segment by — and it does not split fixed from variable cost, so
+  operating leverage hides inside the rate effect. It also compares two periods with no test of
+  whether the movement exceeds normal variation; chart it with `oplab.spc` first.
 - There is no forecasting, optimisation or simulation yet. Those are waves 3 and 4 of
   [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -205,7 +239,7 @@ Stated plainly, because the gaps matter as much as the coverage:
 ```bash
 ruff check . && ruff format --check .   # lint and format
 mypy                                    # type check
-pytest --cov                            # 173 tests, 93% statement coverage
+pytest --cov                            # 204 tests, 94% statement coverage
 ```
 
 CI runs all four on Python 3.10 and 3.12.

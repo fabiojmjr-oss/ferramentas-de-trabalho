@@ -11,6 +11,7 @@ scripts use. Generating it costs a few seconds, so they are marked ``slow``.
 
 from __future__ import annotations
 
+import pandas as pd
 import pytest
 
 from oplab.kpi import fill_rate, otif, service_sensitivity
@@ -205,6 +206,55 @@ def test_slotting_table(full: Dataset) -> None:
     assert float(correlation) == pytest.approx(0.88, abs=5e-3)
 
 
+def test_variance_attribution_table(full: Dataset) -> None:
+    """oplab/variance/README.md: the same 15.75 BRL move, attributed two different ways."""
+    from oplab.variance import price_volume_mix, unit_value_bridge
+
+    ledger = full.cost_ledger.copy()
+    ledger["quantity"] = 1.0
+    ledger["half"] = (
+        (pd.to_datetime(ledger["order_date"]).dt.month > 6)
+        .map({False: "H1", True: "H2"})
+        .astype(str)
+    )
+    base = ledger.loc[ledger["half"] == "H1"]
+    current = ledger.loc[ledger["half"] == "H2"]
+
+    total = price_volume_mix(
+        base, current, key=["site", "channel", "size_band"], quantity="quantity", value="total_brl"
+    )
+    assert total.relative_delta == pytest.approx(0.281, abs=1e-3)
+    assert total.effects["volume"] / total.delta == pytest.approx(0.22, abs=5e-3)
+    assert total.reconciliation_error == pytest.approx(0.0, abs=1e-6)
+
+    with_channel = unit_value_bridge(
+        base, current, key=["site", "channel", "size_band"], quantity="quantity", value="total_brl"
+    )
+    without_channel = unit_value_bridge(
+        base, current, key=["site", "size_band"], quantity="quantity", value="total_brl"
+    )
+
+    assert with_channel.base_rate == pytest.approx(76.02, abs=5e-3)
+    assert with_channel.current_rate == pytest.approx(91.77, abs=5e-3)
+    assert with_channel.relative_delta == pytest.approx(0.207, abs=1e-3)
+
+    # The movement is identical; only the attribution differs.
+    assert without_channel.delta == pytest.approx(with_channel.delta, abs=1e-9)
+    assert with_channel.delta == pytest.approx(15.749, abs=5e-3)
+
+    assert without_channel.effects["rate"] == pytest.approx(15.610, abs=5e-3)
+    assert without_channel.effects["mix"] == pytest.approx(0.139, abs=5e-3)
+    assert with_channel.effects["rate"] == pytest.approx(11.665, abs=5e-3)
+    assert with_channel.effects["mix"] == pytest.approx(4.084, abs=5e-3)
+
+    assert without_channel.effects["rate"] / without_channel.delta == pytest.approx(0.991, abs=1e-3)
+    assert with_channel.effects["rate"] / with_channel.delta == pytest.approx(0.741, abs=1e-3)
+
+    # Both reconcile exactly, which is what makes the mis-attribution invisible.
+    assert abs(with_channel.reconciliation_error) < 1e-9
+    assert abs(without_channel.reconciliation_error) < 1e-9
+
+
 def test_examples_run_without_error() -> None:
     """The three example scripts are part of the deliverable; a broken one is a broken README."""
     import runpy
@@ -214,7 +264,7 @@ def test_examples_run_without_error() -> None:
 
     root = Path(__file__).resolve().parents[1]
     scripts = sorted((root / "examples").glob("*.py"))
-    assert len(scripts) == 4
+    assert len(scripts) == 5
 
     for script in scripts:
         captured, sys.stdout = sys.stdout, StringIO()
