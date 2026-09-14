@@ -19,6 +19,13 @@ class SiteProfile:
         availability: Probability that an order line is shipped complete on the first attempt.
         putaway_median_h: Median dock-to-stock time on inbound, in hours.
         count_accuracy: Probability that a cycle-counted location matches the system record.
+        territory_scale: Multiplier on the delivery radius. A metropolitan site serves a
+            concentrated territory and a regional one serves a dispersed one, and that
+            difference is the most obvious mix effect in any real network - it is why a remote
+            site's cost per delivery is partly geography rather than performance. Leaving every
+            site with an identically shaped territory, as an earlier version of this generator
+            did, makes that confound impossible to observe and leaves a benchmarking tool
+            nothing to remove.
     """
 
     code: str
@@ -29,13 +36,14 @@ class SiteProfile:
     availability: float
     putaway_median_h: float
     count_accuracy: float
+    territory_scale: float = 1.0
 
 
 DEFAULT_SITES: tuple[SiteProfile, ...] = (
-    SiteProfile("CD-SP", 1.00, 1, 14.0, 0.35, 0.965, 5.0, 0.985),
-    SiteProfile("CD-RJ", 0.55, 2, 26.0, 0.45, 0.940, 8.0, 0.965),
-    SiteProfile("CD-PE", 0.30, 3, 52.0, 0.60, 0.905, 13.0, 0.930),
-    SiteProfile("CD-RS", 0.35, 3, 44.0, 0.50, 0.925, 10.0, 0.950),
+    SiteProfile("CD-SP", 1.00, 1, 14.0, 0.35, 0.965, 5.0, 0.985, territory_scale=0.80),
+    SiteProfile("CD-RJ", 0.55, 2, 26.0, 0.45, 0.940, 8.0, 0.965, territory_scale=1.00),
+    SiteProfile("CD-PE", 0.30, 3, 52.0, 0.60, 0.905, 13.0, 0.930, territory_scale=1.75),
+    SiteProfile("CD-RS", 0.35, 3, 44.0, 0.50, 0.925, 10.0, 0.950, territory_scale=1.35),
 )
 
 

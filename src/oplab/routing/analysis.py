@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from statistics import NormalDist
 
 import numpy as np
 import pandas as pd
@@ -147,6 +148,7 @@ def density_curve(
     vehicle: VehicleType,
     shares: Sequence[float] = (0.25, 0.5, 0.75, 1.0),
     solution_limit: int = 300,
+    replications: int = 4,
     seed: int = 42,
 ) -> pd.DataFrame:
     """Route random subsets of the same territory, to isolate the effect of density.
@@ -156,47 +158,94 @@ def density_curve(
     delivery in last-mile distribution is governed by drop density far more than by distance,
     and the intuition of anyone who thinks in kilometres runs the other way.
 
+    Each share is routed several times on independent subsamples, and the reason is a mistake
+    worth not repeating. With one draw per share the curve came out non-monotonic - 37 stops
+    costing more per delivery than 18 - because a single small subsample confounds density with
+    *which* customers happened to be drawn. One lucky draw clusters, one unlucky draw scatters,
+    and the effect swamps the thing being measured. Replicating and reporting the spread is the
+    same discipline the capacity simulation applies, for the same reason.
+
     Args:
         problem: The full day.
         vehicle: The fleet.
         shares: Fractions of the stops to route.
         solution_limit: Search budget per solve.
+        replications: Independent subsamples per share. The full share is deterministic, so it
+            is solved once regardless.
         seed: Sampling seed.
 
     Returns:
-        One row per share with stops routed, cost per delivery, stops per vehicle and
-        kilometres per delivery.
+        One row per share with the mean cost per delivery across replications, a 95% confidence
+        interval on that mean, and the mean stops per vehicle and kilometres per delivery. Read
+        the intervals before reading the curve: at intermediate shares the between-draw
+        variation is of the same order as the density effect itself, so the direction is the
+        finding and the intermediate levels are not.
+
+    Raises:
+        ValueError: If a share is outside ``(0, 1]`` or ``replications`` is not positive.
     """
     if any(not 0.0 < share <= 1.0 for share in shares):
         raise ValueError("shares must be in (0, 1]")
+    if replications < 1:
+        raise ValueError("replications must be positive")
 
     rng = np.random.default_rng(seed)
     rows = []
     for share in sorted(shares):
         count = max(2, int(round(share * problem.n_stops)))
-        chosen = rng.choice(problem.n_stops, size=count, replace=False)
-        subset = build_problem(
-            problem.stops.iloc[np.sort(chosen)],
-            speed_kmh=problem.speed_kmh,
-            circuity=problem.circuity,
-            day_start_h=problem.day_start_h,
-            day_end_h=problem.day_end_h,
-        )
-        solution = solve(subset, vehicle, solution_limit=solution_limit)
+        draws = 1 if count >= problem.n_stops else replications
+
+        costs: list[float] = []
+        per_vehicle: list[float] = []
+        km_each: list[float] = []
+        vehicles: list[int] = []
+        feasible = True
+
+        for _ in range(draws):
+            chosen = rng.choice(problem.n_stops, size=count, replace=False)
+            subset = build_problem(
+                problem.stops.iloc[np.sort(chosen)],
+                speed_kmh=problem.speed_kmh,
+                circuity=problem.circuity,
+                day_start_h=problem.day_start_h,
+                day_end_h=problem.day_end_h,
+            )
+            solution = solve(subset, vehicle, solution_limit=solution_limit)
+            feasible = feasible and solution.feasible
+            if not solution.stops_served:
+                continue
+            costs.append(solution.cost_per_delivery)
+            per_vehicle.append(solution.stops_per_vehicle)
+            km_each.append(solution.total_km / solution.stops_served)
+            vehicles.append(solution.vehicles_used)
+
         rows.append(
             {
                 "share": share,
-                "stops": subset.n_stops,
-                "feasible": solution.feasible,
-                "vehicles_used": solution.vehicles_used,
-                "stops_per_vehicle": solution.stops_per_vehicle,
-                "km_per_delivery": solution.total_km / solution.stops_served
-                if solution.stops_served
-                else np.nan,
-                "cost_per_delivery": solution.cost_per_delivery,
+                "stops": count,
+                "replications": draws,
+                "feasible": feasible,
+                "vehicles_used": float(np.mean(vehicles)) if vehicles else np.nan,
+                "stops_per_vehicle": float(np.mean(per_vehicle)) if per_vehicle else np.nan,
+                "km_per_delivery": float(np.mean(km_each)) if km_each else np.nan,
+                "cost_per_delivery": float(np.mean(costs)) if costs else np.nan,
+                "cost_ci_low": _mean_interval(costs)[0],
+                "cost_ci_high": _mean_interval(costs)[1],
             }
         )
     return pd.DataFrame(rows)
+
+
+def _mean_interval(values: list[float], confidence: float = 0.95) -> tuple[float, float]:
+    """A 95% normal-approximation interval on the mean of a handful of replications."""
+    if not values:
+        return (np.nan, np.nan)
+    if len(values) == 1:
+        return (values[0], values[0])
+    z = NormalDist().inv_cdf(0.5 + confidence / 2.0)
+    mean = float(np.mean(values))
+    half = z * float(np.std(values, ddof=1)) / np.sqrt(len(values))
+    return (mean - half, mean + half)
 
 
 def compare_fleets(

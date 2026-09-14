@@ -10,6 +10,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Lint, types and the fast suite, on every supported interpreter. 351 tests in about ten
+  # seconds, so this is the job that gates a push.
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -39,4 +41,25 @@ jobs:
         run: mypy
 
       - name: Test
-        run: pytest --cov --cov-report=term-missing
+        run: pytest -m "not slow" --cov --cov-report=term-missing
+
+  # Every figure quoted in a README, plus all the example scripts. These take minutes rather
+  # than seconds - the routing and simulation claims are re-solved and re-replicated - and they
+  # do not depend on the interpreter version, so they run once rather than across the matrix.
+  claims:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Verify every documented figure
+        run: pytest -m slow -v

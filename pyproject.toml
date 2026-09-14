@@ -29,6 +29,7 @@ dependencies = [
 plot = ["matplotlib>=3.7"]
 simulation = ["simpy>=4.1"]
 routing = ["ortools>=9.10"]
+benchmark = ["ortools>=9.10"]
 # Linters are pinned to a compatible release rather than floating. A formatter that gains a
 # rule between a local run and a CI run turns a correct change into a red build, which happened
 # twice before these bounds were added.
@@ -75,7 +76,7 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
 markers = [
-  "slow: builds the full default dataset; a few seconds each",
+  "slow: re-derives a figure quoted in a README, or runs an example script; minutes, not seconds",
 ]
 
 [tool.coverage.run]

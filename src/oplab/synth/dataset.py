@@ -33,8 +33,8 @@ class Dataset:
     subgroups: pd.DataFrame
     layout: pd.DataFrame
     assignment: pd.DataFrame
-    cost_ledger: pd.DataFrame
     deliveries: pd.DataFrame
+    cost_ledger: pd.DataFrame
 
     @property
     def tables(self) -> dict[str, pd.DataFrame]:
@@ -94,8 +94,10 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
     # stream leaves every earlier table byte-identical, so published figures keep reproducing.
     layout = generate_layout(cfg)
     assignment = generate_assignment(catalog, layout, rng)
-    cost_ledger = generate_cost_ledger(cfg, order_lines, catalog, rng)
-    deliveries = generate_deliveries(cfg, cost_ledger, rng)
+    # Geography before money: freight depends on how far the delivery is, so the delivery
+    # table has to exist before the ledger can be derived from it.
+    deliveries = generate_deliveries(cfg, order_lines, catalog, rng)
+    cost_ledger = generate_cost_ledger(cfg, deliveries, rng)
 
     return Dataset(
         config=cfg,
@@ -107,6 +109,6 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
         subgroups=subgroups,
         layout=layout,
         assignment=assignment,
-        cost_ledger=cost_ledger,
         deliveries=deliveries,
+        cost_ledger=cost_ledger,
     )

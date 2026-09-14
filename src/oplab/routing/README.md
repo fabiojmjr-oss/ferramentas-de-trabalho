@@ -13,38 +13,38 @@ It is a refusal. Routing 74 deliveries from one depot:
 
 | Option | Vehicles | Cost per delivery |
 | --- | --- | --- |
-| Own van | 5 | **38.50** |
+| Own van | 5 | **36.11** |
 | Third-party carrier at 42.00 | — | 42.00 |
-| Own truck | 5 | 64.21 |
+| Own truck | 5 | 60.72 |
 
-The van beats the carrier by 3.50 per delivery, an 8.3% advantage — at the search budget used
-for that table. Give the solver a cheaper budget and the van costs 53.29, and the carrier wins
-comfortably.
+The van beats the carrier by 5.89 per delivery, a 14% saving on the carrier's rate — at the
+search budget used for that table. Give the solver a cheaper budget and the van costs 44.08,
+and the carrier wins.
 
 **The conclusion flips with how hard the solver was allowed to look.** A cheap solve says buy
-the service; a thorough one says run the fleet. The make-or-buy gap is a quarter of the spread
+the service; a thorough one says run the fleet. The make-or-buy gap is smaller than the spread
 the search budget alone produces, so **this model does not settle make-or-buy at this price**,
-and saying so is the output. Reporting an 8% advantage as a finding — from a heuristic that
+and saying so is the output. Reporting a 14% advantage as a finding — from a heuristic that
 never proved optimality, on straight-line distances scaled by an assumed circuity factor, for
 one Wednesday in June — would be a number with a decision attached to it and nothing
 underneath.
 
 What the model does settle, by a margin no assumption threatens: the truck is the wrong vehicle
-for this profile, at 67% more per delivery.
+for this profile, at 68% more per delivery.
 
 ## "Optimal" is not what comes back
 
 | Search budget | Vehicles | Cost per delivery |
 | --- | --- | --- |
-| 20 solutions | 8 | 53.29 |
-| 60 | 8 | 50.76 |
-| 120 | 6 | 42.17 |
-| 300 | **5** | **38.50** |
+| 20 solutions | 7 | 44.08 |
+| 60 | 7 | 42.13 |
+| 120 | 5 | 36.88 |
+| 300 | **5** | **36.11** |
 
 OR-Tools runs a construction heuristic and then local search until its budget runs out. It does
 not prove optimality, and for a problem of any size the answer is not optimal. Note what
-changed down the rows: not only the cost, by 27.7%, but **the fleet size**, from eight vehicles
-to five. A tender decided on a cheap solve would have bought three vans it did not need.
+changed down the rows: not only the cost, by 18.1%, but **the fleet size**, from seven vehicles
+to five. A tender decided on a cheap solve would have bought two vans it did not need.
 
 **The budget is a solution count, not a stopwatch.** A wall-clock limit makes the answer depend
 on the machine and on what else that machine is doing: the same problem under CPU contention
@@ -56,15 +56,22 @@ reports `hit_time_cap`.
 
 ## Density, not distance
 
-| Stops in the territory | Km per delivery | Cost per delivery |
+| Stops in the territory | Km per delivery | Cost per delivery (95% interval) |
 | --- | --- | --- |
-| 18 | 15.82 | 53.22 |
-| 37 | 16.01 | 48.21 |
-| 74 | 12.54 | **38.50** |
+| 18 | 14.14 | 49.68 [46.68, 52.69] |
+| 37 | 13.08 | 43.28 [37.63, 48.93] |
+| 74 | 11.41 | **36.11** |
 
 Same territory throughout — the stops are a random subsample of the same day, so the area never
-changes, only how many customers sit in it. Four times the density is **28% lower cost per
+changes, only how many customers sit in it. Four times the density is **27% lower cost per
 delivery**.
+
+Read the intervals before the curve, because they came out of a correction. With a single draw
+per share the curve was **not monotonic** — 37 stops costing more per delivery than 18 — since
+one small subsample confounds density with *which* customers happened to be drawn. Replicating
+fixes the direction and also bounds the claim honestly: the endpoints separate, so the effect
+across the full range is established; 18 against 37 does not separate, so that intermediate
+level is not a result.
 
 Nothing about the distances changed. Drop density governs cost per delivery in last-mile
 distribution far more than distance does, which is why a growing territory can get cheaper per
@@ -75,13 +82,14 @@ priced off average distance misprices both.
 
 | Case | Vehicles | Cost per delivery |
 | --- | --- | --- |
-| Windows enforced | 5 | 38.50 |
-| Windows opened to the full day | 5 | 37.68 |
+| Windows enforced | 5 | 36.11 |
+| Windows opened to the full day | 5 | 34.80 |
 
-The commercial promise costs **2.2%, and no extra vehicle**.
+The commercial promise costs **3.8%, and no extra vehicle**.
 
 That figure is a correction, and the correction is the more useful finding. Under a smaller
-search budget the same comparison came out at 8.8% and one extra van. The reason is not noise:
+search budget the same comparison came out at nearly three times the premium and one extra van.
+The reason is not noise:
 **an under-searched solve exaggerates the cost of every constraint it prices**, because the
 heuristic struggles more with the constrained problem than with the open one, so the penalty it
 reports is partly its own failure to find the good constrained plan. Anyone pricing what a
@@ -105,10 +113,9 @@ an optimisation.
 and time at the door has to be spent, and neither can be shared between vehicles. There is
 deliberately no travel-based bound, and the omission is a correction. Summing the outbound leg
 to every stop and dividing by the shift looks like a bound and is not one — it assumes each stop
-needs its own round trip, when a route visiting twelve stops drives the radius once and
-amortises it. That figure came out at seven vehicles for a day the solver routes with five: a
-"lower bound" above the achieved solution. The amount by which routing beats it *is* the density
-effect above.
+needs its own round trip, when a route visiting fifteen stops drives the radius once and
+amortises it. That figure came out above the achieved solution, which is simply a wrong bound.
+The amount by which routing beats it *is* the density effect above.
 
 ## Cost, not distance, is the objective
 
@@ -170,36 +177,36 @@ Construído sobre OR-Tools. Instale o extra: `pip install -e ".[routing]"`.
 
 | Opção | Veículos | Custo por entrega |
 | --- | --- | --- |
-| Van própria | 5 | **38,50** |
+| Van própria | 5 | **36,11** |
 | Transportadora a 42,00 | — | 42,00 |
-| Caminhão próprio | 5 | 64,21 |
+| Caminhão próprio | 5 | 60,72 |
 
-A van vence a transportadora por R$ 3,50 por entrega — vantagem de 8,3% — *no orçamento de
-busca usado nessa tabela*. Dê ao solver um orçamento mais barato e a van custa R$ 53,29, e a
-transportadora ganha com folga.
+A van vence a transportadora por R$ 5,89 por entrega — 14% de economia sobre a tarifa — *no
+orçamento de busca usado nessa tabela*. Dê ao solver um orçamento mais barato e a van custa
+R$ 44,08, e a transportadora ganha.
 
 **A conclusão se inverte conforme o quanto o solver teve permissão de procurar.** Um solve
-barato diz terceirize; um minucioso diz opere a frota. A diferença entre as opções é um quarto
-da amplitude que o orçamento de busca sozinho produz, então **este modelo não decide frota
+barato diz terceirize; um minucioso diz opere a frota. A diferença entre as opções é menor que
+a amplitude que o orçamento de busca sozinho produz, então **este modelo não decide frota
 própria versus terceirizada nesse preço**, e dizer isso *é* o resultado. Reportar uma vantagem
-de 8% como achado — a partir de uma heurística que nunca provou otimalidade, sobre distâncias em
+de 14% como achado — a partir de uma heurística que nunca provou otimalidade, sobre distâncias em
 linha reta multiplicadas por um fator de circuidade presumido, para uma quarta-feira de junho —
 seria um número com uma decisão pendurada nele e nada por baixo.
 
 O que o modelo decide, por margem que nenhuma premissa ameaça: o caminhão é o veículo errado
-para este perfil, a 67% mais por entrega.
+para este perfil, a 68% mais por entrega.
 
 ### "Ótimo" não é o que volta
 
 | Orçamento de busca | Veículos | Custo por entrega |
 | --- | --- | --- |
-| 20 soluções | 8 | 53,29 |
-| 60 | 8 | 50,76 |
-| 120 | 6 | 42,17 |
-| 300 | **5** | **38,50** |
+| 20 soluções | 7 | 44,08 |
+| 60 | 7 | 42,13 |
+| 120 | 5 | 36,88 |
+| 300 | **5** | **36,11** |
 
-O que mudou ao longo das linhas não foi só o custo, em 27,7%: foi **o tamanho da frota**, de oito
-veículos para cinco. Uma concorrência decidida com um solve barato teria comprado três vans
+O que mudou ao longo das linhas não foi só o custo, em 18,1%: foi **o tamanho da frota**, de sete
+veículos para cinco. Uma concorrência decidida com um solve barato teria comprado duas vans
 desnecessárias.
 
 **O orçamento é contagem de soluções, não cronômetro.** Limite de tempo de parede faz a resposta
@@ -210,15 +217,21 @@ Contar soluções aceitas torna o resultado reproduzível em qualquer lugar.
 
 ### Densidade, não distância
 
-| Paradas no território | Km por entrega | Custo por entrega |
+| Paradas no território | Km por entrega | Custo por entrega (intervalo 95%) |
 | --- | --- | --- |
-| 18 | 15,82 | 53,22 |
-| 37 | 16,01 | 48,21 |
-| 74 | 12,54 | **38,50** |
+| 18 | 14,14 | 49,68 [46,68, 52,69] |
+| 37 | 13,08 | 43,28 [37,63, 48,93] |
+| 74 | 11,41 | **36,11** |
 
 Mesmo território em todas as linhas — as paradas são subamostra aleatória do mesmo dia, então a
-área nunca muda, só quantos clientes há nela. Quatro vezes a densidade são **28% menos custo por
+área nunca muda, só quantos clientes há nela. Quatro vezes a densidade são **27% menos custo por
 entrega**.
+
+Leia os intervalos antes da curva, porque eles vieram de uma correção. Com um único sorteio por
+ponto a curva saiu **não monotônica** — 37 paradas custando mais por entrega que 18 — porque uma
+subamostra pequena confunde densidade com *quais* clientes foram sorteados. Replicar corrige a
+direção e também delimita a afirmação: os extremos se separam, então o efeito na faixa completa
+está estabelecido; 18 contra 37 não se separa, então esse nível intermediário não é resultado.
 
 Nada nas distâncias mudou. Densidade de entrega governa o custo por entrega na última milha
 muito mais que distância — por isso um território em crescimento pode ficar mais barato por
@@ -228,13 +241,13 @@ parada enquanto um em retração fica mais caro, sem nenhuma tarifa se mover.
 
 | Caso | Veículos | Custo por entrega |
 | --- | --- | --- |
-| Janelas respeitadas | 5 | 38,50 |
-| Janelas abertas ao dia todo | 5 | 37,68 |
+| Janelas respeitadas | 5 | 36,11 |
+| Janelas abertas ao dia todo | 5 | 34,80 |
 
-A promessa comercial custa **2,2%, e nenhum veículo extra**.
+A promessa comercial custa **3,8%, e nenhum veículo extra**.
 
 Esse número é uma correção, e a correção é o achado mais útil. Com orçamento de busca menor, a
-mesma comparação dava 8,8% e uma van extra. O motivo não é ruído: **um solve com busca
+mesma comparação dava quase três vezes o prêmio e uma van extra. O motivo não é ruído: **um solve com busca
 insuficiente exagera o custo de toda restrição que ele precifica**, porque a heurística sofre
 mais com o problema restrito que com o aberto, então a penalidade reportada é em parte o próprio
 fracasso dela. Quem precifica o custo de uma promessa de serviço roteirizando com e sem ela

@@ -18,7 +18,7 @@ decision-neutral is left out.
 | 4 | Variance decomposer | `oplab.variance` | Why did cost per order move, and who owns the delta? | 2 — done |
 | 5 | DC capacity simulation | `oplab.simulation` | Where is the constraint, and what does relieving it buy? | 3 — done |
 | 6 | Route optimiser | `oplab.routing` | What does a delivery cost under each fleet scenario? | 3 — done |
-| 7 | Multi-site benchmark | `oplab.benchmark` | Which site is genuinely underperforming once size and mix are held constant? | 4 |
+| 7 | Multi-site benchmark | `oplab.benchmark` | Which site is genuinely underperforming once size and mix are held constant? | 4 — done |
 | 8 | Process mining | `oplab.mining` | What does the process actually do, as opposed to the flowchart? | 4 |
 | 9 | Forecast baseline | `oplab.forecast` | Does this forecast beat seasonal naive, measured honestly? | 4 |
 | 10 | Inventory policy lab | `oplab.inventory` | What does each point of service level cost in working capital? | 4 |
@@ -112,11 +112,33 @@ not the 8.8% the under-searched solve reported, because a heuristic given too li
 struggles more with the constrained problem than with the open one and therefore overstates the
 cost of every constraint priced with it.
 
+Wave 3 is closed. Wave 4 is in progress: the multi-site benchmark is done.
+
 ## Wave 4 — differentiation
 
-**Multi-site benchmark.** Normalisation by size and mix, then data envelopment analysis for
-relative efficiency across multiple inputs and outputs. Comparing sites of different scale
-without normalisation produces a political ranking, not a technical one.
+**Multi-site benchmark** *(complete — [module README](../src/oplab/benchmark/README.md))*.
+Scale normalisation, indirect standardisation, peer z-scores with rank-stability testing, and
+DEA with a discrimination check.
+
+Three findings, and two of them are about the method. A third of the cost-per-order gap between
+the best and worst site is the distance profile they serve rather than how they are run: the
+worst site reads 58% more expensive crude and 35% adjusted. Under random weightings the ranking
+between sites turns out to be a fact while the ranking between one site's own months is a
+weighting artefact - 2 of 4 against 12 of 12, with swings up to ten places. And DEA needs twelve
+units for this measure set on a network of four, where the symptom is that the returns-to-scale
+choice moves the worst site by 27 points, mostly as a penalty for being small.
+
+Building it exposed a real incoherence in the generator, which is what a benchmarking tool is
+supposed to do. Freight cost did not depend on delivery distance, because the ledger was
+generated before the geography - so a distance existed that affected nothing and a freight cost
+existed that ignored distance. The generator now derives cost from the delivery table, and each
+site serves a territory of its own dispersion. Without both fixes there was no geographic
+confound anywhere in the data and this module had nothing to demonstrate on.
+
+It also needed a leave-one-out option that was not in the plan. Indirect standardisation
+compares each unit against a benchmark it is part of, and on four sites that is a quarter of the
+reference: a site 20% worse than its peers scores 1.02 rather than 1.20 because its own cost
+drags the standard towards it.
 
 **Process mining.** From an event log to a discovered process map, cycle time per transition,
 rework loops, and lead time against value-added time. A value stream map generated from data

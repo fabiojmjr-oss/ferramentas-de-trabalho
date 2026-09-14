@@ -36,8 +36,9 @@ em silêncio.
 | `oplab.variance` | Por que o custo por pedido mudou, e quem responde por cada parte? | [README](src/oplab/variance/README.md) |
 | `oplab.simulation` | Onde está a restrição, e o que aliviá-la compra? | [README](src/oplab/simulation/README.md) |
 | `oplab.routing` | Quanto custa uma entrega, e quais decisões o modelo consegue fechar? | [README](src/oplab/routing/README.md) |
+| `oplab.benchmark` | Qual unidade está abaixo, neutralizados porte e geografia? | [README](src/oplab/benchmark/README.md) |
 
-Mais quatro ferramentas estão planejadas. Sequência e regra de seleção em
+Mais três ferramentas estão planejadas. Sequência e regra de seleção em
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Instalação
@@ -61,7 +62,7 @@ print(service_sensitivity(dataset.order_lines))  # uma carteira, quatro convenç
 
 ---
 
-## Sete coisas que isso demonstra
+## Oito coisas que isso demonstra
 
 ### 1. Dezesseis pontos de nível de serviço sem mexer na operação
 
@@ -154,23 +155,23 @@ desenhada para demanda previsível, e é daí que vêm as falhas de serviço.
 
 ### 5. O mesmo movimento de custo, atribuído de duas formas diferentes
 
-O custo por pedido subiu 20,7% no ano no razão embutido. A decomposição é exata nos dois casos,
+O custo por pedido subiu 13,7% no ano no razão embutido. A decomposição é exata nos dois casos,
 e a segmentação decide a resposta:
 
 | Efeito | Segmentado por unidade e tamanho | Com canal adicionado |
 | --- | --- | --- |
-| Taxa | **+15,61 (99,1%)** | +11,67 (74,1%) |
-| Mix | +0,14 (0,9%) | **+4,08 (25,9%)** |
-| Total | +15,75 | +15,75 |
+| Taxa | **+11,55 (98,2%)** | +9,20 (78,2%) |
+| Mix | +0,21 (1,8%) | **+2,57 (21,8%)** |
+| Total | +11,77 | +11,77 |
 
-O movimento é idêntico. A atribuição não é. Omita a dimensão canal e 99% da alta lê como
-operacional; inclua-a e um quarto é mix, porque a participação do canal direto ao consumidor
+O movimento é idêntico. A atribuição não é. Omita a dimensão canal e 98% da alta lê como
+operacional; inclua-a e um quinto é mix, porque a participação do canal direto ao consumidor
 cresceu e uma entrega residencial custa quase o dobro por parada que uma entrega em loja.
 
 **Uma dimensão omitida não desaparece. Ela reaparece dentro do efeito taxa e é atribuída a quem
-responde pela taxa** — e é invisível, porque a aritmética fecha em 2,8e-14 nos dois casos.
+responde pela taxa** — e é invisível, porque a aritmética fecha abaixo de 1e-13 nos dois casos.
 
-Duas outras coisas saem do mesmo módulo. O custo total subiu 28,1%, dos quais 22% foram volume
+Duas outras coisas saem do mesmo módulo. O custo total subiu 20,7%, dos quais 30% foram volume
 — o mesmo negócio ficou maior, o que não é problema de custo. E uma métrica por unidade não pode
 se mover por volume: a ponte tem exatamente dois termos por construção, então *"o custo por
 pedido subiu, mas o volume cresceu"* não é explicação. Detalhes, inclusive a ressalva de
@@ -215,26 +216,56 @@ Roteirizando 74 entregas de um depósito, sob quatro orçamentos de busca:
 
 | Orçamento de busca | Veículos | Custo por entrega |
 | --- | --- | --- |
-| 20 soluções | 8 | 53,29 |
-| 120 | 6 | 42,17 |
-| 300 | **5** | **38,50** |
+| 20 soluções | 7 | 44,08 |
+| 120 | 5 | 36,88 |
+| 300 | **5** | **36,11** |
 
 Contra uma transportadora cotando R$ 42,00 por entrega, **a conclusão se inverte conforme o
 quanto o solver teve permissão de procurar.** Um solve barato diz terceirize; um minucioso diz
-opere a frota. O tamanho da frota também se move com o orçamento, de oito veículos para cinco —
-uma concorrência decidida com solve barato teria comprado três vans desnecessárias.
+opere a frota. O tamanho da frota também se move com o orçamento, de sete veículos para cinco —
+uma concorrência decidida com solve barato teria comprado duas vans desnecessárias.
 
 **Logo o modelo não decide frota própria versus terceirizada nesse preço, e dizer isso é o
 resultado.** O que ele decide, por margem que nenhuma premissa ameaça: o caminhão é o veículo
-errado para este perfil, a 67% mais por entrega.
+errado para este perfil, a 68% mais por entrega.
 
-Dois outros resultados do mesmo módulo. O custo por entrega cai 28% quando o mesmo território
+Dois outros resultados do mesmo módulo. O custo por entrega cai 27% quando o mesmo território
 carrega quatro vezes mais clientes — **densidade, não distância, governa o custo da última
-milha**. E as janelas de entrega custam 2,2%, não os 8,8% que um orçamento menor reportava,
-porque **um solve com busca insuficiente exagera o custo de toda restrição que ele precifica**.
+milha** — e a curva é replicada com intervalos porque um único sorteio por ponto a deixava não
+monotônica. E as janelas de entrega custam 3,8%, não o prêmio bem maior que um orçamento menor
+reportava, porque **um solve com busca insuficiente exagera o custo de toda restrição que ele
+precifica**.
 
 Detalhes, inclusive por que um limite inferior de frota baseado em deslocamento não é limite
 algum, no [README do módulo](src/oplab/routing/README.md).
+
+### 8. Um terço da diferença de custo entre unidades é CEP
+
+As quatro unidades não atendem o mesmo território: 36% das entregas de uma ficam dentro de
+10 km, contra 10% de outra. A padronização indireta pergunta quanto o resto da rede gastaria no
+perfil de distância de cada uma:
+
+| Unidade | Custo bruto por pedido | Padronizado | Razão |
+| --- | --- | --- | --- |
+| CD-PE | 119,00 | 110,32 | 1,20 |
+| CD-SP | 75,28 | 81,85 | 0,89 |
+
+**O CD-PE lê 58% mais caro que o CD-SP no bruto, e 35% quando o perfil de distância é
+neutralizado** — 35% da diferença de manchete é geografia, não desempenho. O primeiro número
+define meta que ninguém alcança; o segundo é discutível pelo mérito.
+
+Dois outros resultados, ambos sobre o método e não sobre a rede. Sob 2.000 ponderações
+aleatórias de um scorecard de quatro métricas, **o ranking entre unidades é fato e o ranking
+entre os meses de uma mesma unidade é teatro**: 2 de 4 unidades podem mudar de posição contra 12
+de 12 meses, onde a maior oscilação é de dez posições. Mesma ferramenta, vereditos opostos, e
+não há como saber em qual caso você está sem medir.
+
+E o DEA — o método que todo mundo procura — exige pelo menos doze unidades para esse conjunto de
+medidas e a rede tem quatro. O sintoma não é que todos saem eficientes; é que a **escolha de
+retornos de escala move a pior unidade em 27 pontos**, a maior parte penalidade por ser pequena
+e não medida de como é operada.
+
+Detalhes no [README do módulo](src/oplab/benchmark/README.md).
 
 ---
 
@@ -315,26 +346,31 @@ Ditas com clareza, porque as lacunas importam tanto quanto a cobertura:
   determinístico, e sem prova de otimalidade. A *ordenação* de cenários sobrevive a tudo isso; os
   custos absolutos não, e a própria ordenação pode se inverter com orçamento de busca pequeno.
   Ver o [README do módulo](src/oplab/routing/README.md).
-- Ainda não há previsão de demanda, benchmarking multiunidade, process mining nem política de
-  estoque. São a onda 4 do [`docs/ROADMAP.md`](docs/ROADMAP.md).
+- O benchmarking só remove mix na dimensão pela qual você estratifica, ajusta sem explicar, e
+  seu DEA é determinístico sem barra de erro. Ver o
+  [README do módulo](src/oplab/benchmark/README.md).
+- Ainda não há previsão de demanda, process mining nem política de estoque. São o restante da
+  onda 4 do [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Desenvolvimento
 
 ```bash
-make install   # instalação editável com as ferramentas de desenvolvimento
-make check     # lint, formatação, tipos e testes - exatamente o que a CI roda
-make examples  # roda os cinco scripts de exemplo
+make install    # instalação editável com as ferramentas de desenvolvimento
+make check      # lint, formatação, tipos e a suíte rápida - o que barra um push
+make check-all  # o acima mais toda figura documentada re-derivada
+make claims     # re-deriva todo número citado em um README
 ```
+
+**366 testes, 95% de cobertura de statements, separados por custo.** O `make check` roda 351
+deles em cerca de vinte segundos e é o que barra um push. Os 15 restantes re-resolvem os
+problemas de roteirização, re-replicam as simulações e rodam os oito scripts de exemplo para
+verificar toda figura citada acima; levam onze minutos, e não dependem da versão do interpretador
+— então a CI roda o portão rápido em Python 3.10 e 3.12 e a verificação de figuras uma vez.
 
 O `make check` existe porque a alternativa falhou duas vezes: rodar o linter e esquecer o
 formatador, e rodar uma ferramenta local mais antiga que a instalada pela CI. As duas
 transformaram uma mudança correta em build vermelho, então os linters estão fixados em release
-compatível e a sequência inteira vive em um único alvo. A CI roda as mesmas quatro verificações
-em Python 3.10 e 3.12.
-
-322 testes, 95% de cobertura de statements. A suíte leva cerca de quatro minutos e meio, a maior
-parte verificando os números de simulação e roteirização citados acima — que é o custo de tê-los
-sob teste em vez de apenas escritos.
+compatível e a sequência inteira vive em um único alvo.
 
 ## Licença
 

@@ -7,10 +7,10 @@ repository free of confidentiality constraints. See ``DISCLAIMER.md``.
 
 from .catalog import generate_catalog
 from .config import DEFAULT_SITES, SiteProfile, SynthConfig
-from .costs import generate_cost_ledger, size_band
+from .costs import generate_cost_ledger
 from .counts import generate_cycle_counts
 from .dataset import Dataset, generate_dataset
-from .deliveries import generate_deliveries
+from .deliveries import generate_deliveries, size_band
 from .demand import generate_demand
 from .inbound import generate_receipts
 from .outbound import generate_order_lines

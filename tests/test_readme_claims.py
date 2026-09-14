@@ -207,7 +207,7 @@ def test_slotting_table(full: Dataset) -> None:
 
 
 def test_variance_attribution_table(full: Dataset) -> None:
-    """oplab/variance/README.md: the same 15.75 BRL move, attributed two different ways."""
+    """oplab/variance/README.md: the same 11.77 BRL move, attributed two different ways."""
     from oplab.variance import price_volume_mix, unit_value_bridge
 
     ledger = full.cost_ledger.copy()
@@ -223,8 +223,8 @@ def test_variance_attribution_table(full: Dataset) -> None:
     total = price_volume_mix(
         base, current, key=["site", "channel", "size_band"], quantity="quantity", value="total_brl"
     )
-    assert total.relative_delta == pytest.approx(0.281, abs=1e-3)
-    assert total.effects["volume"] / total.delta == pytest.approx(0.22, abs=5e-3)
+    assert total.relative_delta == pytest.approx(0.2066, abs=1e-3)
+    assert total.effects["volume"] / total.delta == pytest.approx(0.297, abs=5e-3)
     assert total.reconciliation_error == pytest.approx(0.0, abs=1e-6)
 
     with_channel = unit_value_bridge(
@@ -234,21 +234,21 @@ def test_variance_attribution_table(full: Dataset) -> None:
         base, current, key=["site", "size_band"], quantity="quantity", value="total_brl"
     )
 
-    assert with_channel.base_rate == pytest.approx(76.02, abs=5e-3)
-    assert with_channel.current_rate == pytest.approx(91.77, abs=5e-3)
-    assert with_channel.relative_delta == pytest.approx(0.207, abs=1e-3)
+    assert with_channel.base_rate == pytest.approx(86.007, abs=5e-3)
+    assert with_channel.current_rate == pytest.approx(97.772, abs=5e-3)
+    assert with_channel.relative_delta == pytest.approx(0.1368, abs=1e-3)
 
     # The movement is identical; only the attribution differs.
     assert without_channel.delta == pytest.approx(with_channel.delta, abs=1e-9)
-    assert with_channel.delta == pytest.approx(15.749, abs=5e-3)
+    assert with_channel.delta == pytest.approx(11.765, abs=5e-3)
 
-    assert without_channel.effects["rate"] == pytest.approx(15.610, abs=5e-3)
-    assert without_channel.effects["mix"] == pytest.approx(0.139, abs=5e-3)
-    assert with_channel.effects["rate"] == pytest.approx(11.665, abs=5e-3)
-    assert with_channel.effects["mix"] == pytest.approx(4.084, abs=5e-3)
+    assert without_channel.effects["rate"] == pytest.approx(11.551, abs=5e-3)
+    assert without_channel.effects["mix"] == pytest.approx(0.214, abs=5e-3)
+    assert with_channel.effects["rate"] == pytest.approx(9.198, abs=5e-3)
+    assert with_channel.effects["mix"] == pytest.approx(2.567, abs=5e-3)
 
-    assert without_channel.effects["rate"] / without_channel.delta == pytest.approx(0.991, abs=1e-3)
-    assert with_channel.effects["rate"] / with_channel.delta == pytest.approx(0.741, abs=1e-3)
+    assert without_channel.effects["rate"] / without_channel.delta == pytest.approx(0.982, abs=1e-3)
+    assert with_channel.effects["rate"] / with_channel.delta == pytest.approx(0.782, abs=1e-3)
 
     # Both reconcile exactly, which is what makes the mis-attribution invisible.
     assert abs(with_channel.reconciliation_error) < 1e-9
@@ -349,55 +349,206 @@ def test_routing_tables(full: Dataset) -> None:
     assert bounds["by_service_time"] == 2.0
 
     quality = quality_curve(problem, VAN).set_index("solution_limit")
-    expected = {20: (8, 53.288), 60: (8, 50.760), 120: (6, 42.170), 300: (5, 38.502)}
+    expected = {20: (7, 44.082), 60: (7, 42.126), 120: (5, 36.878), 300: (5, 36.113)}
     for limit, (vehicles, cost) in expected.items():
         assert quality.loc[limit, "vehicles_used"] == vehicles
         assert quality.loc[limit, "cost_per_delivery"] == pytest.approx(cost, abs=5e-3)
     assert not quality["hit_time_cap"].any(), "a capped run would not be reproducible"
 
     budget_spread = quality["cost_per_delivery"].max() - quality["cost_per_delivery"].min()
-    assert budget_spread == pytest.approx(14.79, abs=5e-2)
+    assert budget_spread == pytest.approx(7.97, abs=5e-2)
     # The fleet size, not only the cost, moves with the budget.
-    assert quality.loc[20, "vehicles_used"] - quality.loc[300, "vehicles_used"] == 3
+    assert quality.loc[20, "vehicles_used"] - quality.loc[300, "vehicles_used"] == 2
 
-    density = density_curve(problem, VAN, (0.25, 0.5, 1.0)).set_index("stops")
-    assert density.loc[18, "cost_per_delivery"] == pytest.approx(53.218, abs=5e-3)
-    assert density.loc[37, "cost_per_delivery"] == pytest.approx(48.214, abs=5e-3)
-    assert density.loc[74, "cost_per_delivery"] == pytest.approx(38.502, abs=5e-3)
+    density = density_curve(problem, VAN, (0.25, 0.5, 1.0), replications=8).set_index("stops")
+    assert density.loc[18, "cost_per_delivery"] == pytest.approx(49.684, abs=5e-3)
+    assert density.loc[37, "cost_per_delivery"] == pytest.approx(43.282, abs=5e-3)
+    assert density.loc[74, "cost_per_delivery"] == pytest.approx(36.113, abs=5e-3)
     assert density["cost_per_delivery"].is_monotonic_decreasing
-    # Four times the density is 28% lower cost per delivery, in the same territory.
+    # Four times the density is 27% lower cost per delivery, in the same territory.
     assert 1 - density.loc[74, "cost_per_delivery"] / density.loc[18, "cost_per_delivery"] == (
-        pytest.approx(0.277, abs=5e-3)
+        pytest.approx(0.273, abs=5e-3)
     )
+    # The endpoints separate, so the direction is established. The intermediate step does not,
+    # so its level is not - which is why the curve is replicated and reported with intervals.
+    assert density.loc[18, "cost_ci_low"] > density.loc[74, "cost_ci_high"]
+    assert density.loc[18, "cost_ci_low"] < density.loc[37, "cost_ci_high"]
 
     windows = window_cost(problem, VAN).set_index("case")
-    assert windows.loc["windows enforced", "cost_per_delivery"] == pytest.approx(38.502, abs=5e-3)
-    assert windows.loc["windows opened", "cost_per_delivery"] == pytest.approx(37.683, abs=5e-3)
-    assert windows.loc["windows enforced", "premium_vs_open"] == pytest.approx(0.022, abs=1e-3)
+    assert windows.loc["windows enforced", "cost_per_delivery"] == pytest.approx(36.113, abs=5e-3)
+    assert windows.loc["windows opened", "cost_per_delivery"] == pytest.approx(34.795, abs=5e-3)
+    assert windows.loc["windows enforced", "premium_vs_open"] == pytest.approx(0.038, abs=1e-3)
     # Under a proper budget the windows cost no extra vehicle. An under-searched solve
-    # reported 8.8% and one extra van, because the heuristic struggles more with the
-    # constrained problem than with the open one - so a cheap solve exaggerates the cost of
-    # every constraint.
+    # reported one, because the heuristic struggles more with the constrained problem than
+    # with the open one - so a cheap solve exaggerates the cost of every constraint.
     assert windows.loc["windows enforced", "vehicles_used"] == 5
     assert windows.loc["windows opened", "vehicles_used"] == 5
 
     fleets = compare_fleets(
         problem, {"van": VAN, "truck": TRUCK}, third_party_price_per_delivery=42.0
     ).set_index("option")
-    assert fleets.loc["van", "cost_per_delivery"] == pytest.approx(38.502, abs=5e-3)
-    assert fleets.loc["truck", "cost_per_delivery"] == pytest.approx(64.213, abs=5e-3)
+    assert fleets.loc["van", "cost_per_delivery"] == pytest.approx(36.113, abs=5e-3)
+    assert fleets.loc["truck", "cost_per_delivery"] == pytest.approx(60.717, abs=5e-3)
 
     # The refusal: the conclusion itself flips with the search budget. A cheap solve says buy,
-    # a thorough one says make, and the gap is a quarter of the budget spread.
+    # a thorough one says make, and the gap is smaller than the budget spread.
     assert quality.loc[20, "cost_per_delivery"] > 42.0, "a cheap solve favours the carrier"
     assert quality.loc[300, "cost_per_delivery"] < 42.0, "a thorough one favours the fleet"
     make_or_buy_gap = 42.0 - float(fleets.loc["van", "cost_per_delivery"])
-    assert make_or_buy_gap == pytest.approx(3.50, abs=5e-2)
-    assert make_or_buy_gap < budget_spread / 3.0
+    assert make_or_buy_gap == pytest.approx(5.89, abs=5e-2)
+    assert make_or_buy_gap < budget_spread
 
     # What the model does settle, by a margin no assumption threatens.
     assert fleets.loc["truck", "cost_per_delivery"] / fleets.loc["van", "cost_per_delivery"] == (
-        pytest.approx(1.67, abs=1e-2)
+        pytest.approx(1.68, abs=1e-2)
+    )
+
+
+def test_benchmark_tables(full: Dataset) -> None:
+    """oplab/benchmark/README.md: a third of the cost gap is postcodes, and the same method
+    gives opposite verdicts on two comparisons."""
+    from oplab.benchmark import (
+        dea,
+        discrimination_check,
+        indirect_standardisation,
+        peer_z_scores,
+        rank_stability,
+    )
+    from oplab.kpi import line_service
+
+    ledger = full.cost_ledger.copy()
+    ledger["band"] = pd.cut(
+        ledger["distance_km"],
+        [0.0, 10.0, 25.0, 50.0, float("inf")],
+        labels=["0-10 km", "10-25 km", "25-50 km", "50+ km"],
+    ).astype(str)
+
+    # The territories genuinely differ, which is what makes the adjustment necessary.
+    mix = ledger.groupby(["site", "band"], observed=True).size().unstack(fill_value=0)
+    shares = mix.div(mix.sum(axis=1), axis=0)
+    assert shares.loc["CD-SP", "0-10 km"] == pytest.approx(0.364, abs=5e-3)
+    assert shares.loc["CD-PE", "0-10 km"] == pytest.approx(0.098, abs=5e-3)
+
+    aggregated = (
+        ledger.groupby(["site", "band"], observed=True)
+        .agg(cost=("total_brl", "sum"), deliveries=("order_id", "size"))
+        .reset_index()
+    )
+    standardised = indirect_standardisation(
+        aggregated, "site", "band", "cost", "deliveries", exclude_self=True
+    ).set_index("site")
+
+    expected = {
+        "CD-PE": (119.00, 110.32, 1.20),
+        "CD-RS": (97.86, 93.13, 1.01),
+        "CD-RJ": (83.34, 85.48, 0.93),
+        "CD-SP": (75.28, 81.85, 0.89),
+    }
+    for site, (crude, adjusted, ratio) in expected.items():
+        row = standardised.loc[site]
+        assert row["crude_rate"] == pytest.approx(crude, abs=5e-2)
+        assert row["standardised_rate"] == pytest.approx(adjusted, abs=5e-2)
+        assert row["standardised_ratio"] == pytest.approx(ratio, abs=5e-3)
+
+    crude_spread = standardised["crude_rate"].max() - standardised["crude_rate"].min()
+    adjusted_spread = (
+        standardised["standardised_rate"].max() - standardised["standardised_rate"].min()
+    )
+    assert crude_spread == pytest.approx(43.72, abs=5e-2)
+    assert adjusted_spread == pytest.approx(28.47, abs=5e-2)
+    assert 1 - adjusted_spread / crude_spread == pytest.approx(0.35, abs=5e-3)
+
+    # 58% more expensive crude, 35% once the distance profile is held constant.
+    crude_gap = standardised.loc["CD-PE", "crude_rate"] / standardised.loc["CD-SP", "crude_rate"]
+    adjusted_gap = (
+        standardised.loc["CD-PE", "standardised_rate"]
+        / standardised.loc["CD-SP", "standardised_rate"]
+    )
+    assert crude_gap - 1 == pytest.approx(0.58, abs=5e-3)
+    assert adjusted_gap - 1 == pytest.approx(0.35, abs=5e-3)
+
+    # Between sites the ranking is a fact; between months at one site it is a weighting.
+    lines = line_service(full.order_lines)
+    scoped = lines.loc[lines["in_scope"]]
+    from oplab.kpi import dock_to_stock, inventory_record_accuracy
+
+    scorecard = pd.concat(
+        [
+            scoped.groupby("site", observed=True)["otif"].mean().rename("otif"),
+            ledger.groupby("site", observed=True)["total_brl"].mean().rename("cost_per_order"),
+            dock_to_stock(full.receipts)
+            .query("stage == 'dock_to_stock_h'")
+            .set_index("site")["p95"]
+            .rename("dock_to_stock_p95_h"),
+            inventory_record_accuracy(full.cycle_counts)
+            .set_index("site")["location_accuracy"]
+            .rename("inventory_accuracy"),
+        ],
+        axis=1,
+    ).reset_index(names="site")
+    metrics = ["otif", "cost_per_order", "dock_to_stock_p95_h", "inventory_accuracy"]
+    direction = {
+        "otif": True,
+        "cost_per_order": False,
+        "dock_to_stock_p95_h": False,
+        "inventory_accuracy": True,
+    }
+    site_scores = peer_z_scores(scorecard, metrics, direction, unit="site")
+    site_stability = rank_stability(site_scores, metrics, unit="site").set_index("site")
+    assert site_stability.loc["CD-SP", "share_first"] == pytest.approx(0.973, abs=5e-3)
+    assert site_stability.loc["CD-PE", "best_rank"] == site_stability.loc["CD-PE", "worst_rank"]
+    assert site_stability.loc["CD-RS", "best_rank"] == site_stability.loc["CD-RS", "worst_rank"]
+    movable_sites = int((site_stability["best_rank"] != site_stability["worst_rank"]).sum())
+    assert movable_sites == 2
+
+    # Month on month at one site the same method gives the opposite verdict.
+    monthly = scoped.loc[scoped["site"].astype(str) == "CD-SP"].copy()
+    monthly["month"] = monthly["order_ts"].dt.to_period("M").astype(str)
+    site_ledger = ledger.loc[ledger["site"].astype(str) == "CD-SP"]
+    month_frame = pd.concat(
+        [
+            monthly.groupby("month", observed=True)["otif"].mean().rename("otif"),
+            site_ledger.groupby("month", observed=True)["total_brl"]
+            .mean()
+            .rename("cost_per_order"),
+            site_ledger.groupby("month", observed=True)
+            .apply(lambda g: g["handling_brl"].sum() / g["lines"].sum(), include_groups=False)
+            .rename("handling_per_line"),
+        ],
+        axis=1,
+    ).reset_index(names="month")
+    month_metrics = ["otif", "cost_per_order", "handling_per_line"]
+    month_direction = {"otif": True, "cost_per_order": False, "handling_per_line": False}
+    month_stability = rank_stability(
+        peer_z_scores(month_frame, month_metrics, month_direction, unit="month"),
+        month_metrics,
+        unit="month",
+    )
+    movable_months = int((month_stability["best_rank"] != month_stability["worst_rank"]).sum())
+    assert movable_months == 12, "every month's rank is decided by the weighting"
+    assert int((month_stability["worst_rank"] - month_stability["best_rank"]).max()) == 10
+
+    # DEA on four sites cannot discriminate, and the modelling choice moves the worst site by
+    # more than any real difference between units.
+    inputs, outputs = ["freight_brl", "handling_brl"], ["otif_lines", "units"]
+    cost = ledger.groupby("site", observed=True).agg(
+        freight_brl=("freight_brl", "sum"), handling_brl=("handling_brl", "sum")
+    )
+    service = scoped.groupby("site", observed=True).agg(
+        otif_lines=("otif", "sum"), units=("qty_delivered", "sum")
+    )
+    sites = cost.join(service).reset_index()
+    sites["otif_lines"] = sites["otif_lines"].astype(float)
+
+    assert not discrimination_check(len(sites), 2, 2).adequate
+    crs = dea(sites, inputs, outputs).set_index("site")
+    vrs = dea(sites, inputs, outputs, returns_to_scale="vrs").set_index("site")
+    assert crs["on_frontier"].mean() == pytest.approx(0.50)
+    assert vrs["on_frontier"].mean() == pytest.approx(0.75)
+    assert crs.loc["CD-PE", "efficiency"] == pytest.approx(0.626, abs=5e-3)
+    assert vrs.loc["CD-PE", "efficiency"] == pytest.approx(0.895, abs=5e-3)
+    assert vrs.loc["CD-PE", "efficiency"] - crs.loc["CD-PE", "efficiency"] == pytest.approx(
+        0.27, abs=5e-3
     )
 
 
@@ -410,7 +561,7 @@ def test_examples_run_without_error() -> None:
 
     root = Path(__file__).resolve().parents[1]
     scripts = sorted((root / "examples").glob("*.py"))
-    assert len(scripts) == 7
+    assert len(scripts) == 8
 
     for script in scripts:
         captured, sys.stdout = sys.stdout, StringIO()

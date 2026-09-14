@@ -13,14 +13,20 @@ PYTHON ?= python3
 
 help:
 	@echo "install    install the package and dev tools"
-	@echo "check      lint, format check, type check and test - exactly what CI runs"
+	@echo "check      lint, format check, type check and the fast suite - what gates a push"
+	@echo "check-all  the above plus every documented figure re-derived"
+	@echo "claims     re-derive every number quoted in a README"
 	@echo "format     rewrite files to the canonical format"
 	@echo "examples   run every example script"
 
 install:
 	$(PYTHON) -m pip install -e ".[dev]"
 
+# What a push should be gated on: lint, types and the fast suite.
 check: lint typecheck test
+
+# Everything, including the documented-figure verification. Minutes, not seconds.
+check-all: lint typecheck test claims
 
 lint:
 	$(PYTHON) -m ruff check .
@@ -34,7 +40,12 @@ typecheck:
 	$(PYTHON) -m mypy
 
 test:
-	$(PYTHON) -m pytest --cov --cov-report=term-missing
+	$(PYTHON) -m pytest -m "not slow" --cov --cov-report=term-missing
+
+# Re-derives every number quoted in a README and runs all the example scripts. Slow on
+# purpose: the routing and simulation claims are re-solved and re-replicated.
+claims:
+	$(PYTHON) -m pytest -m slow -v
 
 examples:
 	@for script in examples/*.py; do echo "--- $$script"; $(PYTHON) "$$script" >/dev/null || exit 1; done

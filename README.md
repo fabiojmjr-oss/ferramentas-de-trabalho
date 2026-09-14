@@ -36,8 +36,9 @@ one silently.
 | `oplab.variance` | Why did cost per order move, and who owns each part of it? | [README](src/oplab/variance/README.md) |
 | `oplab.simulation` | Where is the constraint, and what does relieving it buy? | [README](src/oplab/simulation/README.md) |
 | `oplab.routing` | What does a delivery cost, and which decisions can the model settle? | [README](src/oplab/routing/README.md) |
+| `oplab.benchmark` | Which site is underperforming once size and geography are held constant? | [README](src/oplab/benchmark/README.md) |
 
-Four more tools are planned. Build sequence and selection rule in
+Three more tools are planned. Build sequence and selection rule in
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Install
@@ -61,7 +62,7 @@ print(service_sensitivity(dataset.order_lines))  # one order book, four conventi
 
 ---
 
-## Seven things it demonstrates
+## Eight things it demonstrates
 
 ### 1. A sixteen-point service spread with no change to the operation
 
@@ -154,24 +155,24 @@ for predictable demand, and that is where the service failures come from.
 
 ### 5. The same cost movement, attributed two different ways
 
-Cost per order rose 20.7% over the year on the bundled ledger. The decomposition is exact
+Cost per order rose 13.7% over the year on the bundled ledger. The decomposition is exact
 either way, and the segmentation decides the answer:
 
 | Effect | Segmented by site and order size | With channel added |
 | --- | --- | --- |
-| Rate | **+15.61 (99.1%)** | +11.67 (74.1%) |
-| Mix | +0.14 (0.9%) | **+4.08 (25.9%)** |
-| Total | +15.75 | +15.75 |
+| Rate | **+11.55 (98.2%)** | +9.20 (78.2%) |
+| Mix | +0.21 (1.8%) | **+2.57 (21.8%)** |
+| Total | +11.77 | +11.77 |
 
-The movement is identical. The attribution is not. Omit the channel dimension and 99% of the
-rise reads as operational; add it and a quarter is mix, because the direct-to-consumer share
-grew and a home delivery costs nearly twice as much per stop as a store delivery.
+The movement is identical. The attribution is not. Omit the channel dimension and 98% of the
+rise reads as operational; add it and a fifth is mix, because the direct-to-consumer share grew
+and a home delivery costs nearly twice as much per stop as a store delivery.
 
 **An omitted dimension does not disappear. It reappears inside the rate effect and is
 attributed to whoever owns the rate** — and it is invisible, because the arithmetic reconciles
-to 2.8e-14 either way.
+to under 1e-13 either way.
 
-Two more things fall out of the same module. Total cost rose 28.1%, of which 22% was volume —
+Two more things fall out of the same module. Total cost rose 20.7%, of which 30% was volume —
 the same business got bigger, which is not a cost problem. And a per-unit metric cannot move
 through volume at all: the bridge has exactly two terms by construction, so *"cost per order
 rose but volume grew"* is not an explanation. Details, including the operating-leverage caveat
@@ -216,26 +217,55 @@ Routing 74 deliveries from one depot, under four search budgets:
 
 | Search budget | Vehicles | Cost per delivery |
 | --- | --- | --- |
-| 20 solutions | 8 | 53.29 |
-| 120 | 6 | 42.17 |
-| 300 | **5** | **38.50** |
+| 20 solutions | 7 | 44.08 |
+| 120 | 5 | 36.88 |
+| 300 | **5** | **36.11** |
 
 Against a carrier quoting 42.00 per delivery, **the conclusion flips with how hard the solver
 was allowed to look.** A cheap solve says buy the service; a thorough one says run the fleet.
-The fleet size moves with the budget too, from eight vehicles to five — a tender decided on a
-cheap solve would have bought three vans it did not need.
+The fleet size moves with the budget too, from seven vehicles to five — a tender decided on a
+cheap solve would have bought two vans it did not need.
 
 **So the model cannot settle make-or-buy at this price, and saying so is the output.** What it
 does settle, by a margin no assumption threatens: the truck is the wrong vehicle for this
-profile, at 67% more per delivery.
+profile, at 68% more per delivery.
 
-Two more results from the same module. Cost per delivery falls 28% when the same territory
-carries four times the customers — **density, not distance, governs last-mile cost**. And the
-delivery windows cost 2.2% rather than the 8.8% a smaller budget reported, because **an
-under-searched solve exaggerates the cost of every constraint it prices**.
+Two more results from the same module. Cost per delivery falls 27% when the same territory
+carries four times the customers — **density, not distance, governs last-mile cost**, and the
+curve is replicated with intervals because a single draw per point made it non-monotonic. And
+the delivery windows cost 3.8% rather than the much larger premium a smaller budget reported,
+because **an under-searched solve exaggerates the cost of every constraint it prices**.
 
 Details, including why a travel-based lower bound on fleet size is not a bound at all, in the
 [module README](src/oplab/routing/README.md).
+
+### 8. A third of the cost gap between sites is postcodes
+
+The four sites do not serve the same territory: 36% of one site's deliveries fall inside 10 km,
+against 10% for another. Indirect standardisation asks what the rest of the network would spend
+on each site's own distance profile:
+
+| Site | Crude cost per order | Standardised | Ratio |
+| --- | --- | --- | --- |
+| CD-PE | 119.00 | 110.32 | 1.20 |
+| CD-SP | 75.28 | 81.85 | 0.89 |
+
+**CD-PE reads 58% more expensive than CD-SP crude, and 35% once the distance profile is held
+constant** — 35% of the headline gap is geography rather than performance. The first number
+sets a target nobody can hit; the second is arguable on its merits.
+
+Two more results, both about the method rather than the network. Under 2,000 random weightings
+of a four-metric scorecard, **the ranking between sites is a fact and the ranking between one
+site's own months is theatre**: 2 of 4 sites can change rank against 12 of 12 months, where the
+widest swing is ten places. Same tool, opposite verdicts, and you cannot tell which case you
+are in without measuring it.
+
+And DEA — the method everyone reaches for — needs at least twelve units for this measure set
+and the network has four. The symptom is not that everyone comes out efficient; it is that the
+**returns-to-scale choice moves the worst site by 27 points**, most of which is a penalty for
+being small rather than a measure of how it is run.
+
+Details in the [module README](src/oplab/benchmark/README.md).
 
 ---
 
@@ -311,25 +341,31 @@ Stated plainly, because the gaps matter as much as the coverage:
   optimality. The scenario *ranking* survives all of that; the absolute costs do not, and the
   ranking itself can invert at a small search budget. See the
   [module README](src/oplab/routing/README.md).
-- There is no demand forecasting, multi-site benchmarking, process mining or inventory policy
-  work yet. Those are wave 4 of [`docs/ROADMAP.md`](docs/ROADMAP.md).
+- Benchmarking can only remove mix along a dimension you stratify by, adjusts without
+  explaining, and its DEA is deterministic with no error bars. See the
+  [module README](src/oplab/benchmark/README.md).
+- There is no demand forecasting, process mining or inventory policy work yet. Those are the
+  rest of wave 4 of [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Development
 
 ```bash
-make install   # editable install with the dev tools
-make check     # lint, format check, type check, test - exactly what CI runs
-make examples  # run all five example scripts
+make install    # editable install with the dev tools
+make check      # lint, format, types and the fast suite - what gates a push
+make check-all  # the above plus every documented figure re-derived
+make claims     # re-derive every number quoted in a README
 ```
+
+**366 tests, 95% statement coverage, split by cost.** `make check` runs 351 of them in about
+twenty seconds and is what a push is gated on. The remaining 15 re-solve the routing problems,
+re-replicate the simulations and run all eight example scripts to verify every figure quoted
+above; they take eleven minutes, and they do not depend on the interpreter version, so CI runs
+the fast gate across Python 3.10 and 3.12 and the figure verification once.
 
 `make check` exists because the alternative failed twice: running the linter but forgetting the
 formatter, and running a locally installed tool older than the one CI installs. Both turned a
 correct change into a red build, so the linters are pinned to a compatible release and the
-whole sequence lives in one target. CI runs the same four checks on Python 3.10 and 3.12.
-
-322 tests, 95% statement coverage. The suite takes about four and a half minutes, most of it
-spent verifying the simulation and routing figures quoted above - which is the cost of having
-them under test rather than merely written down.
+whole sequence lives in one target.
 
 ## License
 

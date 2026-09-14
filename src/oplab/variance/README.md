@@ -8,20 +8,19 @@ part of it?*
 ## The finding this module was built to produce
 
 On the bundled cost ledger — 87,000 orders over a year, first half against second — cost per
-order rose 20.7%. The decomposition is exact either way, and the segmentation decides the
-answer:
+order rose 13.7%, from 86.01 to 97.77. The decomposition is exact either way, and the
+segmentation decides the answer:
 
 | Effect | Segmented by site and order size | With channel added |
 | --- | --- | --- |
-| Rate | **+15.61 (99.1%)** | +11.67 (74.1%) |
-| Mix | +0.14 (0.9%) | **+4.08 (25.9%)** |
-| Total | +15.75 | +15.75 |
+| Rate | **+11.55 (98.2%)** | +9.20 (78.2%) |
+| Mix | +0.21 (1.8%) | **+2.57 (21.8%)** |
+| Total | +11.77 | +11.77 |
 
-**The movement is identical. The attribution is not.** Omit the channel dimension and 99% of
-the rise reads as operational. Add it and a quarter of the rise is mix — the
-direct-to-consumer share grew through the year, and a home delivery costs nearly twice as much
-per stop as a store delivery. That is a commercial and network decision arriving inside an
-operational indicator.
+**The movement is identical. The attribution is not.** Omit the channel dimension and 98% of
+the rise reads as operational. Add it and a fifth of the rise is mix — the direct-to-consumer
+share grew through the year, and a home delivery costs nearly twice as much per stop as a store
+delivery. That is a commercial and network decision arriving inside an operational indicator.
 
 **An omitted dimension does not disappear. It reappears inside the rate effect and is
 attributed to whoever owns the rate.** That is the single most common way a cost review blames
@@ -29,7 +28,7 @@ the wrong function, and it is invisible because the arithmetic reconciles perfec
 
 ## The total is the wrong question
 
-Total operating cost rose 28.1%, and 22% of that increase was volume — the same business got
+Total operating cost rose 20.7%, and 30% of that increase was volume — the same business got
 bigger. A review that stops at the total treats growth as a cost problem.
 
 Which is why the module has two entry points:
@@ -88,8 +87,8 @@ quantity rests on that convention, and it is worth a glance before quoting the s
 
 ## Exactness is the point
 
-The effects sum to the change with **no residual** — 2.8e-14 on the bundled ledger, and asserted
-on every test case. A decomposition with a plug line is not a decomposition, it is an
+The effects sum to the change with **no residual** — under 1e-13 on the bundled ledger, and
+asserted on every test case. A decomposition with a plug line is not a decomposition, it is an
 allocation with a plug line, and the plug is where disagreements go to hide. `waterfall()`
 raises rather than draw bars that do not land on the closing total.
 
@@ -136,17 +135,17 @@ responde por cada parte?*
 ### O achado que este módulo foi construído para produzir
 
 No razão de custos embutido — 87.000 pedidos em um ano, primeiro semestre contra segundo — o
-custo por pedido subiu 20,7%. A decomposição é exata nos dois casos, e a segmentação decide a
-resposta:
+custo por pedido subiu 13,7%, de R$ 86,01 para R$ 97,77. A decomposição é exata nos dois casos,
+e a segmentação decide a resposta:
 
 | Efeito | Segmentado por unidade e tamanho | Com canal adicionado |
 | --- | --- | --- |
-| Taxa | **+15,61 (99,1%)** | +11,67 (74,1%) |
-| Mix | +0,14 (0,9%) | **+4,08 (25,9%)** |
-| Total | +15,75 | +15,75 |
+| Taxa | **+11,55 (98,2%)** | +9,20 (78,2%) |
+| Mix | +0,21 (1,8%) | **+2,57 (21,8%)** |
+| Total | +11,77 | +11,77 |
 
-**O movimento é idêntico. A atribuição não é.** Omita a dimensão canal e 99% da alta lê como
-operacional. Inclua-a e um quarto da alta é mix — a participação do canal direto ao consumidor
+**O movimento é idêntico. A atribuição não é.** Omita a dimensão canal e 98% da alta lê como
+operacional. Inclua-a e um quinto da alta é mix — a participação do canal direto ao consumidor
 cresceu no ano, e uma entrega residencial custa quase o dobro por parada que uma entrega em
 loja. É decisão comercial e de rede chegando dentro de um indicador operacional.
 
@@ -156,7 +155,7 @@ invisível porque a aritmética fecha perfeitamente nos dois casos.
 
 ### O total é a pergunta errada
 
-O custo operacional total subiu 28,1%, e 22% desse aumento foi volume — o mesmo negócio ficou
+O custo operacional total subiu 20,7%, e 30% desse aumento foi volume — o mesmo negócio ficou
 maior. Uma análise que para no total trata crescimento como problema de custo.
 
 Por isso o módulo tem duas portas de entrada: `price_volume_mix` (por que o **total** mudou:
@@ -193,8 +192,8 @@ consegue definir.
 
 ### Exatidão é o ponto
 
-Os efeitos somam à variação **sem resíduo** — 2,8e-14 no razão embutido, e verificado em todos
-os casos de teste. Decomposição com linha de ajuste não é decomposição, é rateio com linha de
+Os efeitos somam à variação **sem resíduo** — abaixo de 1e-13 no razão embutido, e verificado em
+todos os casos de teste. Decomposição com linha de ajuste não é decomposição, é rateio com linha de
 ajuste, e é no ajuste que as discordâncias se escondem. `waterfall()` levanta erro em vez de
 desenhar barras que não fecham no total final.
 
