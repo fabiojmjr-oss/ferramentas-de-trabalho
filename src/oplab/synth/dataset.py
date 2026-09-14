@@ -15,6 +15,7 @@ from .demand import generate_demand
 from .inbound import generate_receipts
 from .outbound import generate_order_lines
 from .process import generate_subgroups
+from .warehouse import generate_assignment, generate_layout
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,8 @@ class Dataset:
     receipts: pd.DataFrame
     cycle_counts: pd.DataFrame
     subgroups: pd.DataFrame
+    layout: pd.DataFrame
+    assignment: pd.DataFrame
 
     @property
     def tables(self) -> dict[str, pd.DataFrame]:
@@ -70,8 +73,8 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
         config: Generation parameters. Defaults to :class:`SynthConfig`.
 
     Returns:
-        A :class:`Dataset` holding the catalogue, demand, order lines, receipts, cycle counts
-        and process measurements.
+        A :class:`Dataset` holding the catalogue, demand, order lines, receipts, cycle counts,
+        process measurements, pick-face layout and current slotting assignment.
     """
     cfg = config or SynthConfig()
     rng = np.random.default_rng(cfg.seed)
@@ -82,6 +85,10 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
     receipts = generate_receipts(cfg, rng)
     cycle_counts = generate_cycle_counts(cfg, catalog, rng)
     subgroups = generate_subgroups(rng)
+    # Layout and assignment are generated last on purpose: appending a step to the end of the
+    # stream leaves every earlier table byte-identical, so published figures keep reproducing.
+    layout = generate_layout(cfg)
+    assignment = generate_assignment(catalog, layout, rng)
 
     return Dataset(
         config=cfg,
@@ -91,4 +98,6 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
         receipts=receipts,
         cycle_counts=cycle_counts,
         subgroups=subgroups,
+        layout=layout,
+        assignment=assignment,
     )

@@ -23,9 +23,11 @@ def generate_demand(
 ) -> pd.DataFrame:
     """Generate daily demand per site and SKU.
 
-    The intensity of a Poisson draw is the product of four terms: the SKU base demand, the
-    site scale, a weekday factor and an annual harmonic. Intermittent SKUs are additionally
-    gated by a Bernoulli mask, and a small share of site-days receive a promotional multiplier.
+    The intensity is the product of the SKU base demand, the site scale, a weekday factor, an
+    annual harmonic, and a per-SKU gamma shock whose shape comes from the catalogue. The gamma
+    layer makes demand negative binomial rather than Poisson, so volatility varies across items
+    independently of their volume. Intermittent SKUs are additionally gated by a Bernoulli mask,
+    and a small share of site-days receive a promotional multiplier.
 
     Returns:
         Long frame with columns ``date``, ``site``, ``sku`` and ``demand``, containing only
@@ -38,6 +40,7 @@ def generate_demand(
 
     base = catalog["base_demand"].to_numpy()
     intermittent = catalog["intermittent"].to_numpy()
+    shape = catalog["dispersion_shape"].to_numpy()
     # Sparse items are active on a minority of days; the activity rate itself varies by item.
     active_rate = np.where(intermittent, rng.uniform(0.05, 0.30, size=len(base)), 1.0)
 
@@ -48,7 +51,19 @@ def generate_demand(
             rng.uniform(1.8, 3.5, size=cfg.days),
             1.0,
         )
-        intensity = np.outer(day_factor * promo, base * profile.demand_scale)
+        # A gamma multiplier with mean one and shape from the catalogue turns the Poisson draw
+        # into a negative binomial one. Items with a low shape become genuinely erratic, which
+        # is what gives the XYZ axis of a classification something to separate.
+        #
+        # The shock is drawn per week and held across the days inside it, not redrawn daily.
+        # That is both more realistic - a promotion or a project order runs for days, not for
+        # an afternoon - and statistically necessary: independent daily shocks average out
+        # under weekly aggregation, shrinking the coefficient of variation by the square root
+        # of seven and hiding exactly the volatility the model is trying to create.
+        n_weeks = int(np.ceil(cfg.days / 7))
+        weekly_shock = rng.gamma(shape=shape, scale=1.0 / shape, size=(n_weeks, len(base)))
+        shock = np.repeat(weekly_shock, 7, axis=0)[: cfg.days]
+        intensity = np.outer(day_factor * promo, base * profile.demand_scale) * shock
         counts = rng.poisson(intensity)
         counts *= rng.random(counts.shape) < active_rate
 

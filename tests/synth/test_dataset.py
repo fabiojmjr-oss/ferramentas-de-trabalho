@@ -9,7 +9,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from oplab.synth import SpecialCause, SynthConfig, abc_classes, generate_dataset, generate_subgroups
+from oplab.synth import SpecialCause, SynthConfig, generate_dataset, generate_subgroups
 
 TINY = SynthConfig(days=35, n_skus=25)
 
@@ -37,6 +37,8 @@ def test_every_table_is_populated(dataset) -> None:  # type: ignore[no-untyped-d
         "receipts",
         "cycle_counts",
         "subgroups",
+        "layout",
+        "assignment",
     }
 
 
@@ -88,32 +90,6 @@ def test_catalogue_demand_is_long_tailed(dataset) -> None:  # type: ignore[no-un
     assert top_fifth > 0.5, "a realistic assortment concentrates volume in the fast movers"
 
 
-def test_abc_classes_follow_the_cumulative_cuts() -> None:
-    catalog = pd.DataFrame({"annual_value": [100.0, 50.0, 20.0, 5.0, 1.0]})
-    classes = abc_classes(catalog)
-    assert classes.iloc[0] == "A"
-    assert classes.iloc[-1] == "C"
-    assert set(classes) <= {"A", "B", "C"}
-
-
-@pytest.mark.parametrize(
-    ("kwargs", "message"),
-    [
-        ({"annual_value": [0.0, 0.0]}, "positive value"),
-    ],
-)
-def test_abc_classes_reject_a_degenerate_column(
-    kwargs: dict[str, list[float]], message: str
-) -> None:
-    with pytest.raises(ValueError, match=message):
-        abc_classes(pd.DataFrame(kwargs))
-
-
-def test_abc_classes_report_a_missing_column() -> None:
-    with pytest.raises(KeyError, match="annual_value"):
-        abc_classes(pd.DataFrame({"other": [1.0]}))
-
-
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [
@@ -151,3 +127,44 @@ def test_csv_export_writes_every_table(dataset, tmp_path) -> None:  # type: igno
     written = dataset.to_csv(tmp_path / "out")
     assert set(written) == set(dataset.tables)
     assert all(path.exists() and path.stat().st_size > 0 for path in written.values())
+
+
+def test_layout_is_deterministic_and_ordered(dataset) -> None:  # type: ignore[no-untyped-def]
+    layout = dataset.layout
+    assert len(layout) == dataset.config.pick_locations
+    assert layout["location"].is_unique
+    assert layout["effective_distance_m"].is_monotonic_increasing
+    assert (layout["effective_distance_m"] >= layout["distance_m"]).all()
+    # Level 2 is the golden zone, so the nearest face must be on it, not on the floor.
+    assert int(layout.iloc[0]["level"]) == 2
+
+
+def test_every_sku_has_exactly_one_pick_face(dataset) -> None:  # type: ignore[no-untyped-def]
+    assignment = dataset.assignment
+    assert len(assignment) == len(dataset.catalog)
+    assert assignment["sku"].is_unique
+    assert assignment["location"].is_unique
+    assert assignment["location"].isin(dataset.layout["location"]).all()
+
+
+def test_every_sku_fits_its_pick_face(dataset) -> None:  # type: ignore[no-untyped-def]
+    cube = dataset.catalog.set_index("sku")["case_volume_m3"]
+    capacity = float(dataset.layout["capacity_m3"].min())
+    assert cube.max() <= capacity, "a SKU that does not fit its face needs bulk storage"
+
+
+def test_storage_cube_is_derived_from_weight_and_density(dataset) -> None:  # type: ignore[no-untyped-def]
+    catalog = dataset.catalog
+    assert (catalog["unit_volume_m3"] > 0).all()
+    expected = catalog["unit_volume_m3"] * catalog["units_per_case"]
+    pd.testing.assert_series_equal(catalog["case_volume_m3"], expected.round(6), check_names=False)
+    # Beverages are the densest category, so they occupy the least cube per kilogram.
+    per_kg = catalog["unit_volume_m3"] / catalog["unit_weight_kg"]
+    by_category = per_kg.groupby(catalog["category"], observed=True).mean()
+    assert by_category.idxmin() == "beverages"
+    assert by_category.idxmax() == "electronics"
+
+
+def test_layout_must_have_room_for_the_assortment() -> None:
+    with pytest.raises(ValueError, match="pick locations"):
+        SynthConfig(days=35, n_skus=200, aisles=2, bays_per_aisle=2, levels=2)

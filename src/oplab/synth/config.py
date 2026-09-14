@@ -48,6 +48,13 @@ class SynthConfig:
     different maturity, and a horizon that ends mid-flight so that some orders are still
     in transit. That censoring is intentional - it is the most common source of inflated
     service indicators in production reporting.
+
+    ``erratic_share`` governs a property that is easy to get wrong and changes what a
+    classification can see. Demand volatility must be **decoupled from demand volume**: real
+    assortments contain high-revenue items with lumpy, promotion- or project-driven demand. If
+    volatility is tied to the slow-moving tail, every erratic item is low value by construction,
+    an ABC-XYZ analysis can never produce an AZ cell, and the single most useful finding of that
+    analysis - material revenue riding on unforecastable demand - becomes impossible to observe.
     """
 
     seed: int = 42
@@ -56,9 +63,13 @@ class SynthConfig:
     n_skus: int = 400
     sites: tuple[SiteProfile, ...] = DEFAULT_SITES
     intermittent_share: float = 0.35
+    erratic_share: float = 0.18
     promo_rate: float = 0.02
     cancel_rate: float = 0.012
     lines_per_order: float = 3.2
+    aisles: int = 20
+    bays_per_aisle: int = 30
+    levels: int = 4
     categories: tuple[str, ...] = field(
         default=("dry_goods", "beverages", "personal_care", "home_care", "electronics")
     )
@@ -72,6 +83,20 @@ class SynthConfig:
             raise ValueError("at least one site profile is required")
         if not 0.0 <= self.intermittent_share <= 1.0:
             raise ValueError("intermittent_share must be a probability")
+        if not 0.0 <= self.erratic_share <= 1.0:
+            raise ValueError("erratic_share must be a probability")
+        if min(self.aisles, self.bays_per_aisle, self.levels) < 1:
+            raise ValueError("the layout needs at least one aisle, bay and level")
+        if self.pick_locations < self.n_skus:
+            raise ValueError(
+                f"the layout has {self.pick_locations} pick locations for {self.n_skus} SKUs; "
+                "this model stores each SKU in exactly one location"
+            )
+
+    @property
+    def pick_locations(self) -> int:
+        """Total pick faces in the modelled layout."""
+        return self.aisles * self.bays_per_aisle * self.levels
 
     @property
     def site_codes(self) -> tuple[str, ...]:
