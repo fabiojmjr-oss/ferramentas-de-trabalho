@@ -199,12 +199,13 @@ def apply_rules(
     records = []
     for column, mask in ordered.items():
         rule_no = int(column.split("_")[1])
-        for position in np.flatnonzero(mask):
+        for raw_position in np.flatnonzero(mask):
+            position = int(raw_position)
             records.append(
                 {
                     "rule": rule_no,
                     "description": RULE_DESCRIPTIONS[rule_no],
-                    "position": int(position),
+                    "position": position,
                     "label": z.index[position],
                     "z": float(values[position]),
                 }
