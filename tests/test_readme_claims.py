@@ -1313,16 +1313,160 @@ def test_forecast_error_to_stock_tables(full: Dataset) -> None:
     assert coverage["empirical_coverage"].to_numpy() == pytest.approx(0.9496, abs=5e-5)
 
 
-def test_examples_run_without_error() -> None:
-    """The three example scripts are part of the deliverable; a broken one is a broken README."""
+def test_study_one_reaches_the_verdicts_it_publishes(full: Dataset) -> None:
+    """studies/README.md and the root README: two of four candidates are declined on measurement.
+
+    A study is a chain of measurements ending in a decision, so the decision is what has to be
+    asserted. Each of the four figures below is the one a verdict rests on; if any of them moves,
+    the verdict may no longer follow and the study needs rewriting rather than renumbering.
+    """
+    import numpy as np
+
+    from oplab.benchmark import indirect_standardisation
+    from oplab.forecast import BASELINES, INTERMITTENT, backtest_panel, error_profile, to_panel
+    from oplab.inventory import fit_demand, fit_lead_time, safety_stock, z_for_cycle_service
+    from oplab.kpi import service_sensitivity
+    from oplab.mining import conformance, cost_of_deviation, flow_efficiency, waiting_ranked
+    from oplab.slotting import (
+        abc_xyz,
+        compare_strategies,
+        cube_per_order_index,
+        demand_profile,
+        pick_counts,
+        reslot,
+    )
+    from oplab.synth import HAPPY_PATH, VALUE_ADDING
+
+    # Check 1: the service gap is partly definitional, at 15.6 points of spread.
+    sensitivity = service_sensitivity(full.order_lines)
+    spread = float(sensitivity["otif"].max() - sensitivity["otif"].min())
+    assert spread == pytest.approx(0.156, abs=5e-4)
+
+    # Check 2: 35% of the cost gap is geography, and CD-PE is still the worst site.
+    ledger = full.cost_ledger.copy()
+    ledger["band"] = pd.cut(
+        ledger["distance_km"],
+        [0.0, 10.0, 25.0, 50.0, float("inf")],
+        labels=["0-10 km", "10-25 km", "25-50 km", "50+ km"],
+    ).astype(str)
+    aggregated = (
+        ledger.groupby(["site", "band"], observed=True)
+        .agg(cost=("total_brl", "sum"), deliveries=("order_id", "size"))
+        .reset_index()
+    )
+    standardised = indirect_standardisation(
+        aggregated, "site", "band", "cost", "deliveries", exclude_self=True
+    ).set_index("site")
+    crude = standardised["crude_rate"]
+    adjusted = standardised["standardised_rate"]
+    geography = 1 - (adjusted.max() - adjusted.min()) / (crude.max() - crude.min())
+    assert geography == pytest.approx(0.35, abs=5e-3)
+    assert crude.idxmax() == "CD-PE"
+    assert adjusted.idxmax() == "CD-PE"
+    assert crude.loc["CD-PE"] / crude.loc["CD-SP"] - 1 == pytest.approx(0.58, abs=5e-3)
+    assert adjusted.loc["CD-PE"] / adjusted.loc["CD-SP"] - 1 == pytest.approx(0.35, abs=5e-3)
+
+    # Candidate A: fund. 70% of the travel at CD-PE, and 2.6 points between the three rules.
+    demand = full.demand.loc[full.demand["site"].astype(str) == "CD-PE"]
+    picks = pick_counts(full.order_lines, site="CD-PE")
+    classified = abc_xyz(demand_profile(demand, full.catalog, period="W"))
+    classified = classified.loc[classified.index.isin(picks.index)]
+    cube = full.catalog.set_index("sku")["case_volume_m3"]
+    table = compare_strategies(
+        picks,
+        full.layout,
+        {
+            "current (as received)": full.assignment,
+            "by revenue": reslot(-classified["annual_value"], full.layout, cube=cube),
+            "by popularity": reslot(-picks, full.layout, cube=cube),
+            "by cube-per-order index": reslot(
+                cube_per_order_index(picks, cube), full.layout, cube=cube
+            ),
+        },
+        baseline="current (as received)",
+    )
+    ranked = table.loc[table["strategy"] != "current (as received)"]
+    best = ranked.loc[ranked["mean_distance_per_pick_m"].idxmin()]
+    assert best["strategy"] == "by popularity"
+    assert -best["change_vs_baseline"] == pytest.approx(0.70, abs=5e-3)
+    rule_spread = ranked["change_vs_baseline"].max() - ranked["change_vs_baseline"].min()
+    assert rule_spread == pytest.approx(0.026, abs=5e-4)
+
+    # Candidate B: decline. A forecast of the training mean has the lowest error spread.
+    panel = to_panel(
+        full.demand.loc[full.demand["site"].astype(str) == "CD-SP"], freq="D", key=("sku",)
+    )
+    regular = panel.loc[:, (panel == 0).mean() <= 0.5]
+
+    def mean_forecast(history: np.ndarray, horizon: int) -> np.ndarray:
+        return np.full(horizon, float(np.mean(history)) if history.size else 0.0)
+
+    models = {**BASELINES, **INTERMITTENT, "mean": mean_forecast}
+    assert len(models) == 8
+    results = backtest_panel(regular, models, horizon=7, step=28, min_train=120, season=7)
+    spreads = {name: float(error_profile(results, name)["sd"].median()) for name in models}
+    assert min(spreads, key=lambda name: spreads[name]) == "mean"
+    assert spreads["mean"] == pytest.approx(3.2762, abs=5e-4)
+
+    # Candidate C: fund, scoped. Four handovers hold 75% of the waiting.
+    log = full.order_events
+    efficiency = flow_efficiency(log, VALUE_ADDING)
+    assert efficiency.flow_efficiency == pytest.approx(0.0310, abs=5e-5)
+    cost = cost_of_deviation(log, HAPPY_PATH, VALUE_ADDING).set_index("group")
+    dirty, clean = cost.loc["deviates"], cost.loc["follows the documented path"]
+    assert int(dirty["cases"]) == 1556
+    assert dirty["mean_lead_h"] / clean["mean_lead_h"] == pytest.approx(2.0, abs=5e-2)
+    assert conformance(log, HAPPY_PATH).exact_share == pytest.approx(0.611, abs=5e-4)
+    top_four = waiting_ranked(log).head(4)
+    assert top_four["share_of_waiting"].sum() == pytest.approx(0.754, abs=5e-4)
+    assert list(top_four["activity"]) == ["Ship", "Stock Shortage", "Load", "Allocate Stock"]
+
+    # Candidate D: decline as asked. The plan is 37% short, and the supplier fix releases 16%.
+    orders = full.purchase_orders
+    supplier_of = orders.drop_duplicates("sku").set_index("sku")["supplier"]
+    lead_times = {
+        name: fit_lead_time(
+            group["lead_days"].to_numpy(), quoted=float(group["quoted_lead_days"].iloc[0])
+        )
+        for name, group in orders.groupby("supplier")
+    }
+    z = z_for_cycle_service(0.95)
+    unit_cost = full.catalog.set_index("sku")["unit_cost"]
+    tight_regular = panel.loc[:, (panel == 0).mean() <= 0.2]
+
+    realised = on_quote = capped = 0.0
+    for sku in tight_regular.columns:
+        supplier = supplier_of.get(sku)
+        if supplier is None:
+            continue
+        profile = fit_demand(tight_regular[sku].to_numpy())
+        if profile.mean <= 0.0:
+            continue
+        lead = lead_times[supplier]
+        cost_per_unit = float(unit_cost[sku])
+        realised += safety_stock(profile, lead, z).units * cost_per_unit
+        on_quote += safety_stock(profile, lead, z, use_quoted_lead_time=True).units * cost_per_unit
+        tighter = fit_lead_time(np.minimum(lead.sample, lead.quantile(0.95)), quoted=lead.quoted)
+        capped += safety_stock(profile, tighter, z).units * cost_per_unit
+
+    assert on_quote == pytest.approx(121522, abs=1.0)
+    assert realised == pytest.approx(192305, abs=1.0)
+    assert capped == pytest.approx(162185, abs=1.0)
+    assert 1 - on_quote / realised == pytest.approx(0.37, abs=5e-3)
+    assert realised - capped == pytest.approx(30120, abs=1.0)
+    assert 1 - capped / realised == pytest.approx(0.157, abs=5e-4)
+
+
+def test_examples_and_studies_run_without_error() -> None:
+    """The runnable scripts are part of the deliverable; a broken one is a broken README."""
     import runpy
     import sys
     from io import StringIO
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
-    scripts = sorted((root / "examples").glob("*.py"))
-    assert len(scripts) == 12
+    scripts = sorted((root / "examples").glob("*.py")) + sorted((root / "studies").glob("*.py"))
+    assert len(scripts) == 13
 
     for script in scripts:
         captured, sys.stdout = sys.stdout, StringIO()

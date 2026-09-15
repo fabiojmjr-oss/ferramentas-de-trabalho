@@ -468,6 +468,24 @@ números, não apenas os números. Todos são executados pela suíte de testes.
 
 ---
 
+## Estudos
+
+O `examples/` tem um script por módulo. Um **estudo** toma uma decisão e usa os módulos que
+conseguem precificar as partes dela, na ordem em que a decisão tem de ser tomada — não na ordem em
+que as ferramentas foram construídas.
+
+| Estudo | A decisão que ele toma |
+| --- | --- |
+| [`01_where_to_spend.py`](studies/01_where_to_spend.py) | Quatro candidatos a investimento, um orçamento: quais valem o dinheiro, uma vez precificados nos mesmos dados? |
+
+O estudo 01 recusa dois dos quatro por medição, não por orçamento, estreita os dois que aprova, e
+descobre que o maior item não está na lista — 35% da diferença de custo com que o brief abre é
+geografia, e o próprio número de serviço se move 15,6 pontos só por convenção. Nenhum dos dois se
+resolve gastando dinheiro. Ver [`studies/README.md`](studies/README.md) para o que a forma tem de
+fazer e o que ela não consegue mostrar.
+
+---
+
 ## Princípios de projeto
 
 **Validar na fronteira.** Toda função pública de KPI confere a entrada contra um contrato em
@@ -571,8 +589,8 @@ make check-all  # o acima mais toda figura documentada re-derivada
 make claims     # re-deriva todo número citado em um README
 ```
 
-**560 testes, 96% de cobertura de statements, separados por custo.** O `make check` roda 540
-deles em cerca de vinte e cinco segundos e é o que barra um push. Os 20 restantes re-resolvem os
+**562 testes, 96% de cobertura de statements, separados por custo.** O `make check` roda 541
+deles em cerca de vinte e cinco segundos e é o que barra um push. Os 21 restantes re-resolvem os
 problemas de roteirização, re-replicam as simulações, re-rodam os backtests de previsão e as
 políticas de estoque, e executam os doze scripts de exemplo para verificar toda figura citada
 acima; levam de cinco a seis minutos, e não dependem da versão do interpretador — então a CI roda o portão rápido

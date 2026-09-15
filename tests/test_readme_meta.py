@@ -131,15 +131,23 @@ def test_both_root_readmes_document_the_same_findings() -> None:
     assert [int(number) for number in english] == list(range(1, len(english) + 1))
 
 
-def test_every_example_script_is_referenced_by_a_module_readme_or_the_root() -> None:
-    """An example nobody links is an example nobody runs."""
-    scripts = sorted(path.name for path in (ROOT / "examples").glob("*.py"))
-    assert scripts, "no example scripts found"
+@pytest.mark.parametrize("directory", ["examples", "studies"])
+def test_every_runnable_script_is_referenced_by_some_documentation(directory: str) -> None:
+    """A script nobody links is a script nobody runs.
+
+    This found three unlinked examples on its first run, two of which had been unreferenced since
+    the first wave - working, tested and invisible to any reader.
+    """
+    scripts = sorted(path.name for path in (ROOT / directory).glob("*.py"))
+    assert scripts, f"no scripts found in {directory}/"
 
     linked = set()
     for path in markdown_files():
         text = path.read_text(encoding="utf-8")
-        linked.update(re.findall(r"examples/([\w.]+\.py)", text))
+        # A study README links its own scripts relatively, so both forms count.
+        linked.update(re.findall(rf"{directory}/([\w.]+\.py)", text))
+        if path.parent.name == directory:
+            linked.update(re.findall(r"\]\((\d[\w.]+\.py)\)", text))
 
     missing = [name for name in scripts if name not in linked]
-    assert not missing, f"example scripts linked from no documentation: {missing}"
+    assert not missing, f"{directory} scripts linked from no documentation: {missing}"

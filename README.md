@@ -468,6 +468,24 @@ rather than only the figures. Every one of them is executed by the test suite.
 
 ---
 
+## Studies
+
+`examples/` has one script per module. A **study** takes one decision and uses whichever modules
+can price the parts of it, in the order the decision has to be taken rather than the order the
+tools were built.
+
+| Study | The decision it takes |
+| --- | --- |
+| [`01_where_to_spend.py`](studies/01_where_to_spend.py) | Four funding candidates, one budget: which are worth the money once each is priced on the same data? |
+
+Study 01 declines two of the four on measurement rather than on budget, narrows the two it funds,
+and finds that the largest item is not on the list — 35% of the cost gap the brief opens with is
+geography, and the service number itself moves 15.6 points on convention alone. Neither is fixed by
+spending money. See [`studies/README.md`](studies/README.md) for what the form has to do and what
+it cannot show.
+
+---
+
 ## Design principles
 
 **Validate at the boundary.** Every public KPI function checks its input against a contract in
@@ -566,8 +584,8 @@ make check-all  # the above plus every documented figure re-derived
 make claims     # re-derive every number quoted in a README
 ```
 
-**560 tests, 96% statement coverage, split by cost.** `make check` runs 540 of them in about
-twenty-five seconds and is what a push is gated on. The remaining 20 re-solve the routing problems,
+**562 tests, 96% statement coverage, split by cost.** `make check` runs 541 of them in about
+twenty-five seconds and is what a push is gated on. The remaining 21 re-solve the routing problems,
 re-replicate the simulations, re-run the forecast backtests and the inventory policy runs, and
 execute all twelve example scripts to verify every figure quoted above; they take five to six
 minutes.

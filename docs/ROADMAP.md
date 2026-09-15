@@ -283,8 +283,33 @@ phase-lock explanation, and a shared-demand-shock explanation was ruled out by r
 generator. What settled it was measuring the mean error per origin and per step and seeing the
 between-origin spread come out an order of magnitude below the between-step spread.
 
-**Still open in this wave.** An integrated study crossing every module on one synthetic operation
-and ending in a decision — the piece a reader would go through end to end rather than sampling.
+**An integrated study** *(complete — [`studies/README.md`](../studies/README.md))*. A new artefact
+type, and the directory is separate from `examples/` because the form is different. An example has
+one script per module, each answering the question that module was built for. A study takes **one
+decision** and uses whichever modules can price the parts of it, in the order the decision has to be
+taken rather than the order the tools were built.
+
+`studies/01_where_to_spend.py` takes a brief as it arrives — *CD-PE has the worst service and the
+highest cost per order, fix it* — with four funding candidates, each with a sponsor. It checks the
+brief before pricing anything, prices all four on the same data, and reaches verdicts:
+
+- **Re-slot the pick face: fund**, but decline the algorithm study the sponsor asked for. The best
+  rule recovers 70% of the travel at CD-PE and the three rules sit 2.6 points apart.
+- **Buy a forecasting system: decline.** Of eight methods scored the lowest error spread belongs to
+  a forecast of the training mean, which is what the inventory formula already assumes.
+- **Standardise the order process: fund, scoped** to the four handovers holding 75% of the waiting,
+  rather than to 35 process variants.
+- **Hold more safety stock: decline as asked, act on the cause.** The current plan is already 37%
+  short because it sizes on the contract, and capping one supplier's worst 5% of deliveries releases
+  16% of the assortment's buffer while improving service.
+
+The result worth the form: **the largest item is not on the list of candidates.** 35% of the cost
+gap the brief opens with is geography, and the service number moves 15.6 points on convention alone.
+Neither is fixed by spending money, and neither would have been found by pricing the candidates
+first. The study ends by naming the one measurement that would overturn its own conclusion, which is
+the difference between a conclusion and a position.
+
+**Wave 5 is closed.**
 
 ## Cross-cutting
 
