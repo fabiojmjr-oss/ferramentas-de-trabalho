@@ -84,10 +84,12 @@ def test_the_readmes_quote_the_number_of_tests_that_exist() -> None:
     portuguese = (ROOT / "README.pt-BR.md").read_text(encoding="utf-8")
 
     quoted_total_en = re.search(r"\*\*(\d[\d,]*) tests,", english)
-    quoted_fast_en = re.search(r"runs (\d[\d,]*) of them", english)
+    quoted_fast_en = re.search(r"(\d[\d,]*) of them run in", english)
     quoted_total_pt = re.search(r"\*\*(\d[\d,]*) testes,", portuguese)
     # Anchored on the sentence rather than on the verb: a loose pattern matched "roda 3.10".
-    quoted_fast_pt = re.search(r"`make check` roda (\d[\d,]*)", portuguese)
+    # Re-anchored in wave 8 when the sentence was reworded; the anchor tracks the prose, so a
+    # rewording fails loudly here rather than silently stopping the count from being checked.
+    quoted_fast_pt = re.search(r"(\d[\d,]*) deles rodam em", portuguese)
 
     for label, match in (
         ("English total", quoted_total_en),

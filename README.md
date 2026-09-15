@@ -479,6 +479,7 @@ tools were built.
 | [`01_where_to_spend.py`](studies/01_where_to_spend.py) | Four funding candidates, one budget: which are worth the money once each is priced on the same data? |
 | [`02_what_changed.py`](studies/02_what_changed.py) | Three signals on a Monday slide: which are real, which are artefacts of measurement, and is any action justified? |
 | [`03_audit_a_proposal.py`](studies/03_audit_a_proposal.py) | A vendor proposal with four workstreams and 18% on the cover: can any of it be reproduced on this operation's data? |
+| [`04_commit_to_a_promise.py`](studies/04_commit_to_a_promise.py) | A customer wants 99% fill rate with penalties: what is actually being signed, and at what cost? |
 
 Study 01 declines two of the four on measurement rather than on budget, narrows the two it funds,
 and finds that the largest item is not on the list — 35% of the cost gap the brief opens with is
@@ -496,6 +497,14 @@ one has roughly the right number attached to the wrong mechanism, one cannot be 
 class of model that produced it — this repository's routing module included — and one points in the
 right direction at the wrong part of the problem. A flat rejection would have been wrong on three
 lines out of four.
+
+Study 04 is the only one where the operation makes a claim rather than examining one, and it finds
+that **all four of the largest items in a service negotiation are wording decisions**: the same
+order book delivers 90.03% or 98.26% depending on the fill-rate basis named, the same promise costs
+82% more in stock depending on which service definition it means, and one policy sized for 99%
+breaches a 99% cycle-service clause while clearing a 99% fill-rate clause. Its recommendation is to
+write the definitions down rather than exploit them — a definitional advantage the counterparty has
+not understood is a dispute with a delay on it.
 
 See [`studies/README.md`](studies/README.md) for what the form has to do and what it cannot show.
 
@@ -599,13 +608,19 @@ make check-all  # the above plus every documented figure re-derived
 make claims     # re-derive every number quoted in a README
 ```
 
-**564 tests, 96% statement coverage, split by cost.** `make check` runs 541 of them in about
-twenty-five seconds and is what a push is gated on. The remaining 23 re-solve the routing problems,
+**565 tests, 96% statement coverage, split by cost.** 541 of them run in about twenty-five
+seconds — under a minute for the whole `make check` sequence with the linters, the type check and
+coverage — and that is what a push is gated on. The remaining 24 re-solve the routing problems,
 re-replicate the simulations, re-run the forecast backtests and the inventory policy runs, and
-execute all twelve examples and all three studies to verify every figure quoted above; they take five to six
-minutes.
+execute all twelve examples and all four studies to verify every figure quoted above; they take
+about ten minutes (10m18s and 10m19s on the two most recent runs).
 They do not depend on the interpreter version, so CI runs the fast gate across Python 3.10 and 3.12
 and the figure verification once.
+
+That figure doubled in wave 8, and not because a study was added: pinning the routing search-budget
+sweep costs eight vehicle-routing solves, about ninety seconds, on every run. Buying the correction
+of a published claim cost that much CI time permanently, which is the right trade against leaving
+the wrong prose standing, but it is a trade rather than a free improvement.
 
 `make check` exists because the alternative failed twice: running the linter but forgetting the
 formatter, and running a locally installed tool older than the one CI installs. Both turned a

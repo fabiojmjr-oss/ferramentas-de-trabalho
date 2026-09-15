@@ -479,6 +479,7 @@ que as ferramentas foram construídas.
 | [`01_where_to_spend.py`](studies/01_where_to_spend.py) | Quatro candidatos a investimento, um orçamento: quais valem o dinheiro, uma vez precificados nos mesmos dados? |
 | [`02_what_changed.py`](studies/02_what_changed.py) | Três sinais num slide de segunda-feira: quais são reais, quais são artefato de medição, e alguma ação se justifica? |
 | [`03_audit_a_proposal.py`](studies/03_audit_a_proposal.py) | Uma proposta de fornecedor com quatro frentes e 18% na capa: alguma parte dela se reproduz nos dados desta operação? |
+| [`04_commit_to_a_promise.py`](studies/04_commit_to_a_promise.py) | Um cliente quer 99% de fill rate com penalidade: o que está sendo assinado de fato, e a que custo? |
 
 O estudo 01 recusa dois dos quatro por medição, não por orçamento, estreita os dois que aprova, e
 descobre que o maior item não está na lista — 35% da diferença de custo com que o brief abre é
@@ -496,6 +497,13 @@ não precisa do fornecedor, uma tem aproximadamente o número certo atribuído a
 uma não é verificável pela classe de modelo que a produziu — inclusive o módulo de roteirização
 deste repositório — e uma aponta na direção certa para a parte errada do problema. Recusa sumária
 erraria em três linhas de quatro.
+
+O estudo 04 é o único em que a operação faz uma afirmação em vez de examinar uma, e descobre que
+**os quatro maiores itens de uma negociação de serviço são decisões de redação**: o mesmo livro de
+pedidos entrega 90,03% ou 98,26% conforme a base de fill rate nomeada, a mesma promessa custa 82%
+mais em estoque conforme a definição de serviço, e uma política dimensionada para 99% descumpre uma
+cláusula de 99% de serviço de ciclo enquanto cumpre uma de 99% de fill rate. A recomendação é
+escrever as definições, não explorá-las.
 
 Ver [`studies/README.md`](studies/README.md) para o que a forma tem de fazer e o que ela não
 consegue mostrar.
@@ -605,12 +613,20 @@ make check-all  # o acima mais toda figura documentada re-derivada
 make claims     # re-deriva todo número citado em um README
 ```
 
-**564 testes, 96% de cobertura de statements, separados por custo.** O `make check` roda 541
-deles em cerca de vinte e cinco segundos e é o que barra um push. Os 23 restantes re-resolvem os
-problemas de roteirização, re-replicam as simulações, re-rodam os backtests de previsão e as
-políticas de estoque, e executam os doze exemplos e os três estudos para verificar toda figura citada
-acima; levam de cinco a seis minutos, e não dependem da versão do interpretador — então a CI roda o portão rápido
-em Python 3.10 e 3.12 e a verificação de figuras uma vez.
+**565 testes, 96% de cobertura de statements, separados por custo.** 541 deles rodam em cerca de
+vinte e cinco segundos — menos de um minuto para a sequência inteira do `make check`, com os
+linters, a checagem de tipos e a cobertura — e é o que barra um push. Os 24 restantes re-resolvem
+os problemas de roteirização, re-replicam as simulações, re-rodam os backtests de previsão e as
+políticas de estoque, e executam os doze exemplos e os quatro estudos para verificar toda figura
+citada acima; levam cerca de dez minutos (10m18s e 10m19s nas duas execuções mais recentes), e não
+dependem da versão do interpretador — então a CI roda o portão rápido em Python 3.10 e 3.12 e a
+verificação de figuras uma vez.
+
+Esse número dobrou na onda 8, e não por causa de um estudo novo: fixar a varredura de orçamento de
+busca da roteirização custa oito solves de roteirização de veículos, cerca de noventa segundos, em
+toda execução. Comprar a correção de uma afirmação publicada custou esse tempo de CI de forma
+permanente — troca certa contra deixar a prosa errada de pé, mas uma troca, não uma melhoria de
+graça.
 
 O `make check` existe porque a alternativa falhou duas vezes: rodar o linter e esquecer o
 formatador, e rodar uma ferramenta local mais antiga que a instalada pela CI. As duas

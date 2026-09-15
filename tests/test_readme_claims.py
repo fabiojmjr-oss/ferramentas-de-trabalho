@@ -384,6 +384,30 @@ def test_routing_tables(full: Dataset) -> None:
     assert windows.loc["windows enforced", "vehicles_used"] == 5
     assert windows.loc["windows opened", "vehicles_used"] == 5
 
+    # The budget sweep, which replaced a prose claim that did not reproduce. The premium is a
+    # difference between two errors: at the cheapest budget it comes out negative, which cannot be
+    # true of two optima, so it proves at least one solve is far off rather than showing a bias.
+    sweep = {
+        20: (-0.0170, 7, 6),
+        60: (0.0289, 7, 6),
+        120: (0.0466, 5, 5),
+        300: (0.0379, 5, 5),
+    }
+    premiums = []
+    for budget, (premium, enforced_vehicles, open_vehicles) in sweep.items():
+        swept = window_cost(problem, VAN, solution_limit=budget).set_index("case")
+        assert swept.loc["windows enforced", "premium_vs_open"] == pytest.approx(
+            premium, abs=5e-4
+        ), budget
+        assert swept.loc["windows enforced", "vehicles_used"] == enforced_vehicles, budget
+        assert swept.loc["windows opened", "vehicles_used"] == open_vehicles, budget
+        premiums.append(swept.loc["windows enforced", "premium_vs_open"])
+
+    # The two properties the corrected prose rests on: the sign is not fixed, and the premium is
+    # not monotone in the budget. Either one alone kills "an under-searched solve exaggerates".
+    assert min(premiums) < 0 < max(premiums)
+    assert premiums != sorted(premiums)
+
     fleets = compare_fleets(
         problem, {"van": VAN, "truck": TRUCK}, third_party_price_per_delivery=42.0
     ).set_index("option")
@@ -1690,6 +1714,123 @@ def test_study_three_reaches_the_verdicts_it_publishes(full: Dataset) -> None:
     assert halved == pytest.approx(0.25, abs=0.03)
 
 
+def test_study_four_prices_the_wording_it_refuses_to_exploit(full: Dataset) -> None:
+    """studies/README.md and the root README: on this order book the four largest items in a
+    service contract are wording decisions, not operational ones.
+
+    This is the study whose numbers would leave the building, so each of the four is pinned to
+    the measurement behind it - including the one that says the operation breaches a clause it
+    sized itself to meet, and the one that says the freight premium has no reliable sign.
+    """
+    from oplab.forecast import to_panel
+    from oplab.inventory import (
+        achieved_curve,
+        expected_fill_rate,
+        fit_demand,
+        fit_lead_time,
+        safety_stock,
+        z_for_cycle_service,
+        z_for_fill_rate,
+    )
+    from oplab.inventory.normal import norm_cdf
+    from oplab.kpi import fill_rate, service_sensitivity
+    from oplab.routing import one_day, window_cost
+    from oplab.routing.fleet import VAN
+
+    # Item 1: the fill-rate basis. One order book, three defensible readings.
+    bases = {
+        basis: float(fill_rate(full.order_lines, basis=basis))
+        for basis in ("unit", "line", "order")
+    }
+    assert bases["unit"] == pytest.approx(0.9826, abs=5e-5)
+    assert bases["line"] == pytest.approx(0.9671, abs=5e-5)
+    assert bases["order"] == pytest.approx(0.9003, abs=5e-5)
+    assert (bases["unit"] - bases["order"]) * 100 == pytest.approx(8.2, abs=5e-2)
+    # The asked-for 99% is nearly met on one basis and unreachable on another.
+    assert bases["unit"] < 0.99 < bases["unit"] + 0.01
+    assert 0.99 - bases["order"] > 0.08
+
+    conventions = service_sensitivity(full.order_lines)
+    spread = float(conventions["otif"].max() - conventions["otif"].min())
+    assert spread * 100 == pytest.approx(15.6, abs=5e-2)
+
+    # Item 2: the service definition. The same "99%" priced two ways.
+    panel = to_panel(
+        full.demand.loc[full.demand["site"].astype(str) == "CD-SP"], freq="D", key=("sku",)
+    )
+    regular = panel.loc[:, (panel == 0).mean() <= 0.2]
+    series = regular[regular.sum().sort_values(ascending=False).index[20]]
+    demand = fit_demand(series.to_numpy())
+    orders = full.purchase_orders
+    supplier = orders.drop_duplicates("sku").set_index("sku")["supplier"][series.name]
+    group = orders.loc[orders["supplier"] == supplier]
+    lead = fit_lead_time(
+        group["lead_days"].to_numpy(), quoted=float(group["quoted_lead_days"].iloc[0])
+    )
+    unit_cost = float(full.catalog.set_index("sku").loc[series.name, "unit_cost"])
+    quantity = round(demand.mean * 28)
+    sigma = safety_stock(demand, lead, 1.0).sigma
+
+    z_cycle = z_for_cycle_service(0.99)
+    z_fill = z_for_fill_rate(0.99, sigma, quantity)
+    as_cycle = safety_stock(demand, lead, z_cycle)
+    as_fill = safety_stock(demand, lead, z_fill)
+    assert as_cycle.units == pytest.approx(327.68, abs=5e-3)
+    assert as_fill.units == pytest.approx(180.20, abs=5e-3)
+    assert as_cycle.units * unit_cost == pytest.approx(1838.29, abs=5e-3)
+    assert as_fill.units * unit_cost == pytest.approx(1010.93, abs=5e-3)
+    assert as_cycle.units / as_fill.units - 1 == pytest.approx(0.818, abs=5e-4)
+    # Each reading hits its own 99% and overshoots or undershoots the other.
+    assert expected_fill_rate(z_cycle, sigma, quantity) > 0.99
+    assert norm_cdf(z_fill) < 0.99
+
+    # Item 3: the committed level. Sized for 99%, in breach of 99%.
+    curve = achieved_curve(
+        demand,
+        lead,
+        quantity,
+        unit_cost,
+        series,
+        targets=(0.95, 0.98, 0.99, 0.995),
+        periods=1095,
+        replications=40,
+    ).set_index("cycle_service_target")
+    row = curve.loc[0.99]
+    assert float(row["achieved_cycle_service"]) == pytest.approx(0.9855, abs=5e-4)
+    assert float(row["achieved_fill_rate"]) == pytest.approx(0.9950, abs=5e-4)
+    # One policy, two contracts: a breach on one clause and margin on the other.
+    assert float(row["achieved_cycle_service"]) < 0.99 < float(row["achieved_fill_rate"])
+    assert (0.99 - float(row["achieved_cycle_service"])) * 100 == pytest.approx(0.45, abs=5e-2)
+    assert float(curve.loc[0.995, "capital_per_point"]) == pytest.approx(394.28, abs=5e-3)
+    assert float(curve.loc[0.98, "capital_per_point"]) == pytest.approx(107.70, abs=5e-3)
+    # The last half-point costs more than three times the points below it.
+    assert (
+        float(curve.loc[0.995, "capital_per_point"]) / float(curve.loc[0.98, "capital_per_point"])
+        > 3.0
+    )
+
+    # Item 4: the delivery window. Priced across the search budget it has no reliable sign.
+    problem = one_day(full.deliveries, "CD-SP", "2025-06-11")
+    sweep = {20: (-0.0170, 1), 60: (0.0289, 1), 120: (0.0466, 0), 300: (0.0379, 0)}
+    premiums = []
+    for budget, (premium, extra) in sweep.items():
+        priced = window_cost(problem, VAN, solution_limit=budget).set_index("case")
+        measured = float(priced.loc["windows enforced", "premium_vs_open"])
+        assert measured == pytest.approx(premium, abs=5e-5)
+        assert (
+            int(
+                priced.loc["windows enforced", "vehicles_used"]
+                - priced.loc["windows opened", "vehicles_used"]
+            )
+            == extra
+        )
+        premiums.append(measured)
+    # A negative premium is impossible between two optima, so the cheap row proves
+    # at least one solve is far from optimal - and the sequence is not monotone.
+    assert min(premiums) < 0 < max(premiums)
+    assert premiums != sorted(premiums)
+
+
 def test_examples_and_studies_run_without_error() -> None:
     """The runnable scripts are part of the deliverable; a broken one is a broken README."""
     import runpy
@@ -1699,7 +1840,7 @@ def test_examples_and_studies_run_without_error() -> None:
 
     root = Path(__file__).resolve().parents[1]
     scripts = sorted((root / "examples").glob("*.py")) + sorted((root / "studies").glob("*.py"))
-    assert len(scripts) == 15
+    assert len(scripts) == 16
 
     for script in scripts:
         captured, sys.stdout = sys.stdout, StringIO()

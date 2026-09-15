@@ -394,6 +394,63 @@ search budget on the record.
 **Wave 7 is closed.** The three studies now cover the three shapes a decision takes: pricing your
 own candidates, sifting your own signals, and reproducing somebody else's claim.
 
+## Wave 8 — reasoning about a claim you will be held to
+
+The first three studies all examine a claim that already exists. None of them covers the position
+an operation is actually in when a contract is on the table: **making** the claim, with penalties
+attached. Being wrong there is not an analytical error, it is a penalty payment.
+
+**A commitment study** *(complete —
+[`studies/04_commit_to_a_promise.py`](../studies/04_commit_to_a_promise.py))*. A customer asks for
+99% fill rate, a 24-hour delivery window and penalties for breach. Sign it, or counter?
+
+**The four largest items on the table are wording decisions, not operational ones.** That is the
+finding, and it is uncomfortable, because a year of operational programmes in this repository moves
+service by less than the definitional spread does for free:
+
+- **Which 99%?** The same order book delivers 98.26% on a unit basis, 96.71% on a line basis and
+  90.03% on an order basis — 8.2 points between defensible readings of identical words. The
+  delivery half is worse: the OTIF conventions span 15.6 points with no change to the operation. A
+  clause that says "99% fill rate, 24-hour window" and nothing else has not specified anything; it
+  has deferred the specification to whoever writes the first report, and that is settled later by
+  whoever is losing.
+- **The same promise, priced two ways.** Read as cycle service, 99% costs 327.7 units and BRL
+  1,838 of safety stock; read as fill rate, 180.2 units and BRL 1,011 — **+81.8% of working
+  capital for the same number and the same word.** The customer almost certainly means fill rate,
+  and fill rate is the cheaper commitment; volunteering the expensive reading is a self-inflicted
+  cost that also weakens the negotiation on price.
+- **Sizing for a level is not delivering it.** A policy sized for 99% cycle service is measured at
+  98.55% — 0.45 points short, and a penalty clause pays on what was delivered. The same policy
+  delivers 99.50% on fill rate, clearing the identical number with 0.50 points to spare. One
+  policy, two contracts, one breach and one comfortable margin. And the last half-point is the
+  expensive one: 394.28 of capital per point at 99.5% against 107.70 at 98%.
+- **What the window costs, and how sure we are.** 3.79% of freight at a search budget allowed to
+  look properly — but see below.
+
+**The window check falsified a claim this repository had already published.**
+`src/oplab/routing/README.md` said an under-searched solve *exaggerates* the cost of every
+constraint it prices, at "nearly three times the premium and one extra van". Sweeping the budget
+gives −1.70% at 20 solutions, +2.89% at 60, +4.66% at 120 and +3.79% at 300: not three times
+anything, not monotone, and negative at the cheap end. A negative premium is impossible between two
+optima — the open problem is the constrained one with a restriction removed, so its optimum cannot
+be higher — which makes the negative row proof that at least one solve is nowhere near optimal.
+**The premium is a difference between two errors, not a measurement with a bias**, and until both
+sides are searched properly it has no reliable sign. Both language sections of the routing README
+were corrected and the sweep is now pinned in `test_routing_tables`.
+
+That is the argument for the form. The wrong claim survived a wave of review inside a module
+README; it did not survive the first study that had to quote it to a customer.
+
+**The recommendation is to write the definitions down rather than to exploit them.** A definitional
+advantage the counterparty has not understood is a dispute with a delay on it, and the delay ends
+at the first penalty invoice with the relationship as collateral. The asymmetry is also symmetric:
+the customer can find a stricter reading as easily as we can find a kinder one, and the party who
+wrote nothing down has no answer either way.
+
+**Wave 8 is closed.** The four studies now cover the four positions a decision is taken from:
+pricing your own candidates, sifting your own signals, reproducing somebody else's claim, and
+making a claim you will be held to.
+
 ## Cross-cutting
 
 These are not tools and they matter more than an eleventh one:
