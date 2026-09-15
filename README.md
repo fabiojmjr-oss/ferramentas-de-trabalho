@@ -480,6 +480,7 @@ tools were built.
 | [`02_what_changed.py`](studies/02_what_changed.py) | Three signals on a Monday slide: which are real, which are artefacts of measurement, and is any action justified? |
 | [`03_audit_a_proposal.py`](studies/03_audit_a_proposal.py) | A vendor proposal with four workstreams and 18% on the cover: can any of it be reproduced on this operation's data? |
 | [`04_commit_to_a_promise.py`](studies/04_commit_to_a_promise.py) | A customer wants 99% fill rate with penalties: what is actually being signed, and at what cost? |
+| [`05_decide_before_you_know.py`](studies/05_decide_before_you_know.py) | A supplier failed and the expedite window shuts at noon: of four analyses, which could change what we do? |
 
 Study 01 declines two of the four on measurement rather than on budget, narrows the two it funds,
 and finds that the largest item is not on the list — 35% of the cost gap the brief opens with is
@@ -505,6 +506,16 @@ order book delivers 90.03% or 98.26% depending on the fill-rate basis named, the
 breaches a 99% cycle-service clause while clearing a 99% fill-rate clause. Its recommendation is to
 write the definitions down rather than exploit them — a definitional advantage the counterparty has
 not understood is a dispute with a delay on it.
+
+Study 05 has a clock, which the other four do not, and the triage inverts the agenda. The decision
+being argued about — which of 64 affected SKUs to air-freight — comes to **one SKU worth BRL 202**,
+against BRL 41,893 of exposure it recovers half a percent of. The two factors that decide the
+outcome are nobody's action item: the length of the outage (**26.96x**) and the demand estimate
+(**8.04x**), while the air rate and customs fee the requested optimisation is built on move the
+exposure by exactly nothing. So the highest-value act available at 07:00 is a phone call, which no
+module here produces. The decision still ships, because blanket action only overtakes acceptance at
+95 days of outage — outside every scenario on offer. **The value of information is bounded by the
+value of the decision it informs**, and that bound is computable before the analysis.
 
 See [`studies/README.md`](studies/README.md) for what the form has to do and what it cannot show.
 
@@ -608,12 +619,12 @@ make check-all  # the above plus every documented figure re-derived
 make claims     # re-derive every number quoted in a README
 ```
 
-**565 tests, 96% statement coverage, split by cost.** 541 of them run in about twenty-five
+**566 tests, 96% statement coverage, split by cost.** 541 of them run in about twenty-five
 seconds — under a minute for the whole `make check` sequence with the linters, the type check and
-coverage — and that is what a push is gated on. The remaining 24 re-solve the routing problems,
+coverage — and that is what a push is gated on. The remaining 25 re-solve the routing problems,
 re-replicate the simulations, re-run the forecast backtests and the inventory policy runs, and
-execute all twelve examples and all four studies to verify every figure quoted above; they take
-about ten minutes (10m18s and 10m19s on the two most recent runs).
+execute all twelve examples and all five studies to verify every figure quoted above; they take
+about eleven minutes (10m55s with study 05 added, against 10m18s and 10m19s before it).
 They do not depend on the interpreter version, so CI runs the fast gate across Python 3.10 and 3.12
 and the figure verification once.
 

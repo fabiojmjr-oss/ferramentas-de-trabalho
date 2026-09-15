@@ -1831,6 +1831,152 @@ def test_study_four_prices_the_wording_it_refuses_to_exploit(full: Dataset) -> N
     assert premiums != sorted(premiums)
 
 
+def test_study_five_triages_the_clock_it_is_given(full: Dataset) -> None:
+    """studies/README.md and the root README: under a clock, the decision being argued about is
+    worth BRL 202 while the two factors that dominate the outcome are nobody's action item.
+
+    The verdicts here are a ranking rather than a number, so what is pinned is the ranking: that
+    the priced parameters cannot move the objective at all, that the outage length and the demand
+    estimate can, and that the action does not change anywhere in the plausible range of the
+    unknown - which is what makes the decision safe to take without it.
+    """
+    import numpy as np
+
+    from oplab.forecast import BASELINES, backtest_panel, error_profile, to_panel
+    from oplab.inventory import fit_demand, fit_lead_time, safety_stock, z_for_cycle_service
+    from oplab.inventory.normal import unit_normal_loss
+
+    AIR, MARGIN, CUSTOMS, DELAY = 25.0, 0.40, 1200.0, 21.0
+
+    orders = full.purchase_orders
+    group = orders.loc[orders["supplier"] == "FORN-IMPORT"]
+    lead = fit_lead_time(
+        group["lead_days"].to_numpy(), quoted=float(group["quoted_lead_days"].iloc[0])
+    )
+    # The quote hides a tail, which is real and turns out not to be what is at stake.
+    assert lead.quoted == 30.0
+    assert lead.mean == pytest.approx(31.68, abs=5e-3)
+    assert lead.skew == pytest.approx(5.58, abs=5e-3)
+    assert lead.quantile(0.95) == pytest.approx(36.88, abs=5e-3)
+
+    catalog = full.catalog.set_index("sku")
+    panel = to_panel(full.demand, freq="D", key=("sku",))
+    z = z_for_cycle_service(0.95)
+    rows = []
+    for sku in sorted(group["sku"].unique()):
+        if sku not in panel.columns:
+            continue
+        profile = fit_demand(panel[sku].to_numpy())
+        if profile.mean <= 0.0:
+            continue
+        rows.append(
+            {
+                "sku": sku,
+                "unit_cost": float(catalog.loc[sku, "unit_cost"]),
+                "weight_kg": float(catalog.loc[sku, "unit_weight_kg"]),
+                "demand_mean": profile.mean,
+                "demand_sd": profile.sd,
+                "reorder_point": profile.mean * lead.quoted + safety_stock(profile, lead, z).units,
+            }
+        )
+    items = pd.DataFrame(rows).set_index("sku")
+    assert len(items) == 64
+
+    def shortfall(delay, demand_scale=1.0, lead_base=None, lead_sd=None):
+        horizon = (lead.quoted if lead_base is None else lead_base) + delay
+        spread_lead = lead.sd if lead_sd is None else lead_sd
+        mean = items["demand_mean"] * demand_scale
+        spread = items["demand_sd"] * demand_scale
+        sigma = np.sqrt(horizon * spread**2 + mean**2 * spread_lead**2)
+        zz = (items["reorder_point"] - mean * horizon) / sigma
+        return sigma * zz.map(unit_normal_loss)
+
+    def exposure(margin=MARGIN, **kwargs):
+        return float((margin * items["unit_cost"] * shortfall(**kwargs)).sum())
+
+    # Check 1: the action space. Value density decides eligibility and demand is absent from it.
+    short = shortfall(DELAY)
+    gain = MARGIN * items["unit_cost"] - AIR * items["weight_kg"]
+    density = items["unit_cost"] / items["weight_kg"]
+    net = gain * short - CUSTOMS
+
+    assert pytest.approx(62.5) == AIR / MARGIN
+    assert density.min() == pytest.approx(1.76, abs=5e-3)
+    assert density.max() == pytest.approx(250.29, abs=5e-3)
+    assert int((gain > 0).sum()) == 3
+    worth = net.loc[gain > 0]
+    assert int((worth > 0).sum()) == 1
+    assert float(worth[worth > 0].sum()) == pytest.approx(201.67, abs=5e-3)
+
+    base = exposure(delay=DELAY)
+    assert base == pytest.approx(41892.53, abs=5e-2)
+    blanket = float((CUSTOMS + AIR * items["weight_kg"] * short).sum())
+    assert blanket == pytest.approx(311853, abs=1.0)
+    assert CUSTOMS * len(items) == 76800.0
+    # The whole argued-about decision recovers half a percent of the loss it responds to.
+    assert float(worth[worth > 0].sum()) / base == pytest.approx(0.0048, abs=5e-5)
+
+    # Check 2: the sensitivity ranking, which is the study's actual claim.
+    swings = {
+        "outage": max(exposure(delay=7.0), exposure(delay=45.0))
+        / min(exposure(delay=7.0), exposure(delay=45.0)),
+        "demand": max(
+            exposure(delay=DELAY, demand_scale=0.8), exposure(delay=DELAY, demand_scale=1.2)
+        )
+        / min(exposure(delay=DELAY, demand_scale=0.8), exposure(delay=DELAY, demand_scale=1.2)),
+        "margin": exposure(margin=0.60, delay=DELAY) / exposure(margin=0.25, delay=DELAY),
+        "quoted": exposure(delay=DELAY, lead_base=float(lead.mean))
+        / exposure(delay=DELAY, lead_base=lead.quoted),
+        "lead_sd": exposure(delay=DELAY) / exposure(delay=DELAY, lead_sd=0.0),
+    }
+    assert swings["outage"] == pytest.approx(26.96, abs=5e-3)
+    assert swings["demand"] == pytest.approx(8.04, abs=5e-3)
+    assert swings["margin"] == pytest.approx(2.40, abs=5e-3)
+    assert swings["quoted"] == pytest.approx(1.14, abs=5e-3)
+    assert swings["lead_sd"] == pytest.approx(1.01, abs=5e-3)
+    # The ranking, not just the numbers: the two dominant factors are the two not being argued.
+    assert swings["outage"] > swings["demand"] > swings["margin"] > swings["quoted"]
+    # And the priced parameters move the objective by exactly nothing, because they price the
+    # response rather than the loss. Demonstrated where it bites: sweeping the air rate changes
+    # how many SKUs are eligible while leaving the exposure bit-identical, so the optimisation
+    # everyone wanted reorders its own output without touching the number at stake.
+    eligible = {
+        rate: int(((MARGIN * items["unit_cost"] - rate * items["weight_kg"]) > 0).sum())
+        for rate in (12.0, 25.0, 45.0)
+    }
+    assert eligible == {12.0: 16, 25.0: 3, 45.0: 2}
+    assert exposure(delay=DELAY) == base
+
+    # Check 3: the demand band from this repository's own backtest is wider than the swept +/-20%.
+    affected = panel.loc[:, [s for s in items.index if s in panel.columns]]
+    regular = affected.loc[:, (affected == 0).mean() <= 0.3]
+    assert regular.shape[1] == 42
+    results = backtest_panel(
+        regular,
+        {"seasonal_naive": BASELINES["seasonal_naive"]},
+        horizon=7,
+        step=28,
+        min_train=120,
+        season=7,
+    )
+    profile = error_profile(results, "seasonal_naive")
+    relative = float(
+        (profile["mae"] / items.loc[profile["series"], "demand_mean"].to_numpy()).median()
+    )
+    assert relative == pytest.approx(0.386, abs=5e-4)
+    assert float(profile["sd_ratio"].median()) == pytest.approx(0.8469, abs=5e-4)
+    # So the 8x swing is a floor: the real band is wider than the one that produced it.
+    assert relative > 0.20
+
+    # Check 4: the reversal trigger, solved rather than read off a table.
+    crossing = next(float(day) for day in range(1, 366) if exposure(delay=float(day)) > blanket)
+    assert crossing == 95.0
+    # The action is unchanged across every scenario on the table, which is what makes the
+    # decision safe to take without the number that dominates it.
+    assert exposure(delay=90.0) < blanket
+    assert exposure(delay=7.0) < blanket
+
+
 def test_examples_and_studies_run_without_error() -> None:
     """The runnable scripts are part of the deliverable; a broken one is a broken README."""
     import runpy
@@ -1840,7 +1986,7 @@ def test_examples_and_studies_run_without_error() -> None:
 
     root = Path(__file__).resolve().parents[1]
     scripts = sorted((root / "examples").glob("*.py")) + sorted((root / "studies").glob("*.py"))
-    assert len(scripts) == 16
+    assert len(scripts) == 17
 
     for script in scripts:
         captured, sys.stdout = sys.stdout, StringIO()

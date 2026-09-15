@@ -480,6 +480,7 @@ que as ferramentas foram construídas.
 | [`02_what_changed.py`](studies/02_what_changed.py) | Três sinais num slide de segunda-feira: quais são reais, quais são artefato de medição, e alguma ação se justifica? |
 | [`03_audit_a_proposal.py`](studies/03_audit_a_proposal.py) | Uma proposta de fornecedor com quatro frentes e 18% na capa: alguma parte dela se reproduz nos dados desta operação? |
 | [`04_commit_to_a_promise.py`](studies/04_commit_to_a_promise.py) | Um cliente quer 99% de fill rate com penalidade: o que está sendo assinado de fato, e a que custo? |
+| [`05_decide_before_you_know.py`](studies/05_decide_before_you_know.py) | Um fornecedor falhou e a janela de expedição fecha ao meio-dia: das quatro análises, qual pode mudar o que fazemos? |
 
 O estudo 01 recusa dois dos quatro por medição, não por orçamento, estreita os dois que aprova, e
 descobre que o maior item não está na lista — 35% da diferença de custo com que o brief abre é
@@ -504,6 +505,16 @@ pedidos entrega 90,03% ou 98,26% conforme a base de fill rate nomeada, a mesma p
 mais em estoque conforme a definição de serviço, e uma política dimensionada para 99% descumpre uma
 cláusula de 99% de serviço de ciclo enquanto cumpre uma de 99% de fill rate. A recomendação é
 escrever as definições, não explorá-las.
+
+O estudo 05 tem relógio, o que os outros quatro não têm, e a triagem inverte a agenda. A decisão em
+discussão — quais dos 64 SKUs afetados mandar por aéreo — dá **um SKU, valendo BRL 202**, contra BRL
+41.893 de exposição da qual recupera meio por cento. Os dois fatores que decidem o resultado não são
+ação de ninguém: a duração da falha (**26,96x**) e a estimativa de demanda (**8,04x**), enquanto a
+tarifa aérea e o desembaraço sobre os quais a otimização pedida se apoia movem a exposição em
+exatamente nada. O ato de maior valor disponível às 07:00 é um telefonema, que nenhum módulo daqui
+produz. A decisão sai mesmo assim, porque agir em tudo só supera aceitar a perda a 95 dias de falha —
+fora de todo cenário em discussão. **O valor da informação é limitado pelo valor da decisão que ela
+informa**, e esse limite é calculável antes da análise.
 
 Ver [`studies/README.md`](studies/README.md) para o que a forma tem de fazer e o que ela não
 consegue mostrar.
@@ -613,12 +624,12 @@ make check-all  # o acima mais toda figura documentada re-derivada
 make claims     # re-deriva todo número citado em um README
 ```
 
-**565 testes, 96% de cobertura de statements, separados por custo.** 541 deles rodam em cerca de
+**566 testes, 96% de cobertura de statements, separados por custo.** 541 deles rodam em cerca de
 vinte e cinco segundos — menos de um minuto para a sequência inteira do `make check`, com os
-linters, a checagem de tipos e a cobertura — e é o que barra um push. Os 24 restantes re-resolvem
+linters, a checagem de tipos e a cobertura — e é o que barra um push. Os 25 restantes re-resolvem
 os problemas de roteirização, re-replicam as simulações, re-rodam os backtests de previsão e as
-políticas de estoque, e executam os doze exemplos e os quatro estudos para verificar toda figura
-citada acima; levam cerca de dez minutos (10m18s e 10m19s nas duas execuções mais recentes), e não
+políticas de estoque, e executam os doze exemplos e os cinco estudos para verificar toda figura
+citada acima; levam cerca de onze minutos (10m55s com o estudo 05 incluído, contra 10m18s e 10m19s antes dele), e não
 dependem da versão do interpretador — então a CI roda o portão rápido em Python 3.10 e 3.12 e a
 verificação de figuras uma vez.
 
