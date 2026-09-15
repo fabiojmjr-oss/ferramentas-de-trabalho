@@ -478,6 +478,7 @@ tools were built.
 | --- | --- |
 | [`01_where_to_spend.py`](studies/01_where_to_spend.py) | Four funding candidates, one budget: which are worth the money once each is priced on the same data? |
 | [`02_what_changed.py`](studies/02_what_changed.py) | Three signals on a Monday slide: which are real, which are artefacts of measurement, and is any action justified? |
+| [`03_audit_a_proposal.py`](studies/03_audit_a_proposal.py) | A vendor proposal with four workstreams and 18% on the cover: can any of it be reproduced on this operation's data? |
 
 Study 01 declines two of the four on measurement rather than on budget, narrows the two it funds,
 and finds that the largest item is not on the list — 35% of the cost gap the brief opens with is
@@ -488,6 +489,13 @@ investigation, two corrections to the reporting, and no recovery plan.** Three o
 the slide could not support an action, and one of them — the instinct to connect a service month to
 a process shift — turns out to be untestable, because the process chart covers 2.5 days in June and
 the service number covers twelve months. Two real signals, no relationship available.
+
+Study 03 audits somebody else's claim instead of the operation's own, and **none of the four
+workstreams it examines is simply true or simply false**: one is understated and needs no vendor,
+one has roughly the right number attached to the wrong mechanism, one cannot be verified by the
+class of model that produced it — this repository's routing module included — and one points in the
+right direction at the wrong part of the problem. A flat rejection would have been wrong on three
+lines out of four.
 
 See [`studies/README.md`](studies/README.md) for what the form has to do and what it cannot show.
 
@@ -591,10 +599,10 @@ make check-all  # the above plus every documented figure re-derived
 make claims     # re-derive every number quoted in a README
 ```
 
-**563 tests, 96% statement coverage, split by cost.** `make check` runs 541 of them in about
-twenty-five seconds and is what a push is gated on. The remaining 22 re-solve the routing problems,
+**564 tests, 96% statement coverage, split by cost.** `make check` runs 541 of them in about
+twenty-five seconds and is what a push is gated on. The remaining 23 re-solve the routing problems,
 re-replicate the simulations, re-run the forecast backtests and the inventory policy runs, and
-execute all twelve examples and both studies to verify every figure quoted above; they take five to six
+execute all twelve examples and all three studies to verify every figure quoted above; they take five to six
 minutes.
 They do not depend on the interpreter version, so CI runs the fast gate across Python 3.10 and 3.12
 and the figure verification once.

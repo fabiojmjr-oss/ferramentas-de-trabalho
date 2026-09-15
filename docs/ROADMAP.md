@@ -350,6 +350,50 @@ more common failure — two signals reported on the same slide that share no obs
 
 **Wave 6 is closed.**
 
+## Wave 7 — reasoning about somebody else's claim
+
+Studies 01 and 02 both reason about the operation's own material: one prices candidates the
+operation put forward, the other sifts signals its own reporting produced. Neither covers the case
+that arrives most often in practice — a proposal from outside, with a number on the cover.
+
+**An audit study** *(complete —
+[`studies/03_audit_a_proposal.py`](../studies/03_audit_a_proposal.py))*. A vendor proposal with
+four workstreams and an 18% saving claimed. The reasoning is adversarial reproduction: for each
+claim, can it be recovered from this operation's data, and what would have to be true for it to
+hold?
+
+**None of the four claims is simply true and none is simply false**, which is why the form earns
+its place — a flat rejection would have been wrong on three lines out of four, and accepting the
+deck would have been wrong on all four:
+
+- **Slotting, 30% of pick travel: understated and self-serviceable.** 70% is available at CD-PE
+  and the three ranking rules sit 2.6 points apart, so the prize belongs to re-slotting at all
+  rather than to the optimiser. The vendor undersells the benefit and oversells their share of it.
+- **Forecasting, 20% of inventory: roughly the right number, attached to the wrong mechanism.**
+  The lowest error spread of the models scored belongs to a forecast of the training mean, and the
+  ratio of forecast-error spread to demand spread is 1.0019 — there is nothing to buy. About 16% of
+  the buffer does exist, released by capping one supplier's worst 5% of deliveries. Agreeing the
+  number and disagreeing about the cause is the worst available outcome, because the programme gets
+  paid for a result it did not produce and the real lever stays unpulled.
+- **Routing, 15% of freight: unverifiable by the class of model that produced it.** Baselining on a
+  cheap solve and reporting a thorough one is a saving of **18.1%** from changing nothing about the
+  operation, and the fleet size moves from seven vehicles to five. That exceeds the claim it is
+  asked to verify.
+- **Automation, 25% of cycle time: right direction, wrong part.** Working time is 6.5% of the lead
+  time, so automating every step to zero cuts less than a third of the claim. The 25% is in the
+  40.4 hours of waiting, three quarters of which sits after four handovers — different work, and
+  different suppliers.
+
+The third verdict is the one that matters for the credibility of the other three. **This
+repository's routing module is the same class of model as the one behind the vendor's number, and is
+subject to the same artefact.** The refusal is therefore not an accusation, and an audit that finds
+nothing wrong with its own method is not an audit. What can be asked for instead is a measurable
+commitment on an agreed basket of days, baselined on the operation's own routes, with both sides'
+search budget on the record.
+
+**Wave 7 is closed.** The three studies now cover the three shapes a decision takes: pricing your
+own candidates, sifting your own signals, and reproducing somebody else's claim.
+
 ## Cross-cutting
 
 These are not tools and they matter more than an eleventh one:
