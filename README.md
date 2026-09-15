@@ -547,7 +547,7 @@ make claims     # re-derive every number quoted in a README
 **554 tests, 96% statement coverage, split by cost.** `make check` runs 534 of them in about
 twenty-five seconds and is what a push is gated on. The remaining 20 re-solve the routing problems,
 re-replicate the simulations, re-run the forecast backtests and the inventory policy runs, and
-execute all twelve example scripts to verify every figure quoted above; they take about seven
+execute all twelve example scripts to verify every figure quoted above; they take five to six
 minutes.
 They do not depend on the interpreter version, so CI runs the fast gate across Python 3.10 and 3.12
 and the figure verification once.
