@@ -477,12 +477,19 @@ tools were built.
 | Study | The decision it takes |
 | --- | --- |
 | [`01_where_to_spend.py`](studies/01_where_to_spend.py) | Four funding candidates, one budget: which are worth the money once each is priced on the same data? |
+| [`02_what_changed.py`](studies/02_what_changed.py) | Three signals on a Monday slide: which are real, which are artefacts of measurement, and is any action justified? |
 
 Study 01 declines two of the four on measurement rather than on budget, narrows the two it funds,
 and finds that the largest item is not on the list — 35% of the cost gap the brief opens with is
-geography, and the service number itself moves 15.6 points on convention alone. Neither is fixed by
-spending money. See [`studies/README.md`](studies/README.md) for what the form has to do and what
-it cannot show.
+geography, and the service number itself moves 15.6 points on convention alone.
+
+Study 02 asks the opposite kind of question and reaches an opposite kind of answer: **one
+investigation, two corrections to the reporting, and no recovery plan.** Three of the four items on
+the slide could not support an action, and one of them — the instinct to connect a service month to
+a process shift — turns out to be untestable, because the process chart covers 2.5 days in June and
+the service number covers twelve months. Two real signals, no relationship available.
+
+See [`studies/README.md`](studies/README.md) for what the form has to do and what it cannot show.
 
 ---
 
@@ -584,10 +591,10 @@ make check-all  # the above plus every documented figure re-derived
 make claims     # re-derive every number quoted in a README
 ```
 
-**562 tests, 96% statement coverage, split by cost.** `make check` runs 541 of them in about
-twenty-five seconds and is what a push is gated on. The remaining 21 re-solve the routing problems,
+**563 tests, 96% statement coverage, split by cost.** `make check` runs 541 of them in about
+twenty-five seconds and is what a push is gated on. The remaining 22 re-solve the routing problems,
 re-replicate the simulations, re-run the forecast backtests and the inventory policy runs, and
-execute all twelve example scripts to verify every figure quoted above; they take five to six
+execute all twelve examples and both studies to verify every figure quoted above; they take five to six
 minutes.
 They do not depend on the interpreter version, so CI runs the fast gate across Python 3.10 and 3.12
 and the figure verification once.

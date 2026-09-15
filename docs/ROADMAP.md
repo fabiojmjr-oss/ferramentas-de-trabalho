@@ -311,6 +311,45 @@ the difference between a conclusion and a position.
 
 **Wave 5 is closed.**
 
+## Wave 6 — the other question
+
+Wave 5 ended with a study that prices candidates. This wave adds its opposite, because a library
+that only supports investment cases supports half the job.
+
+**A diagnostic study** *(complete — [`studies/02_what_changed.py`](../studies/02_what_changed.py))*.
+Three signals on a Monday slide: October OTIF the worst month of the year, December the best, and
+the process measurement out of control. The room wants three actions. The study establishes which
+signals are real, which are artefacts of measurement, and whether any two of them are about the
+same thing.
+
+The output is **one investigation, two corrections to the reporting, and no recovery plan** — a
+conclusion that has to be held to a higher standard than one recommending spend, because the cost
+of being wrong about *not* acting lands on nobody's budget. Each refusal rests on a figure:
+
+- **October is a real signal on a chart that cannot be quoted as computed.** The p-chart flags it
+  at 5.04 sigma, and the overdispersion ratio is 1.787 — lines within an order are not independent
+  trials, so the correct sigma is 1.34 times wider and the adjusted signal is 3.77. Still a signal.
+  What settles it is scale: 1.88 points of month-to-month range against **15.57 points of
+  definitional spread**, 8.3 times as much. A recovery plan for a move smaller than the measurement
+  convention is tampering.
+- **December's recovery is censoring.** It is the only month with unresolved lines — 1,636 of them,
+  6.3% of the month — excluded from the denominator under the standard policy. The month with the
+  most lines that have no outcome cannot also be the best month.
+- **The process shift is real, and only visible from a clean baseline.** Subgroup 43 at 3.96 sigma,
+  with a quiet range chart, so the centre moved and the spread did not. Limits estimated from all
+  60 subgroups instead give 14 signals in the stable first 40 against 2.
+- **The two signals cannot be related, and this is the check nobody runs.** The process chart
+  covers 60 hourly subgroups across 2.5 days in June; the service number is monthly across a year.
+  October is not inside the chart's window at all, so any story connecting them is unfalsifiable by
+  construction rather than merely weak.
+
+The last one is the finding that justifies building the study. It was not the finding expected: the
+design assumed the process shift would sit near the service month and the work would be untangling
+a plausible causal story. The windows turned out not to overlap, which is a better result and a
+more common failure — two signals reported on the same slide that share no observation period.
+
+**Wave 6 is closed.**
+
 ## Cross-cutting
 
 These are not tools and they matter more than an eleventh one:

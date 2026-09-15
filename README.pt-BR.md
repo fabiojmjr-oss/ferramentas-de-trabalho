@@ -477,12 +477,20 @@ que as ferramentas foram construídas.
 | Estudo | A decisão que ele toma |
 | --- | --- |
 | [`01_where_to_spend.py`](studies/01_where_to_spend.py) | Quatro candidatos a investimento, um orçamento: quais valem o dinheiro, uma vez precificados nos mesmos dados? |
+| [`02_what_changed.py`](studies/02_what_changed.py) | Três sinais num slide de segunda-feira: quais são reais, quais são artefato de medição, e alguma ação se justifica? |
 
 O estudo 01 recusa dois dos quatro por medição, não por orçamento, estreita os dois que aprova, e
 descobre que o maior item não está na lista — 35% da diferença de custo com que o brief abre é
-geografia, e o próprio número de serviço se move 15,6 pontos só por convenção. Nenhum dos dois se
-resolve gastando dinheiro. Ver [`studies/README.md`](studies/README.md) para o que a forma tem de
-fazer e o que ela não consegue mostrar.
+geografia, e o próprio número de serviço se move 15,6 pontos só por convenção.
+
+O estudo 02 faz o tipo oposto de pergunta e chega ao tipo oposto de resposta: **uma investigação,
+duas correções de relatório e nenhum plano de recuperação.** Três dos quatro itens do slide não
+sustentavam ação, e um deles — o instinto de conectar um mês de serviço a um desvio de processo —
+é intestável, porque a carta de controle cobre 2,5 dias em junho e o número de serviço cobre doze
+meses. Dois sinais reais, nenhuma relação disponível.
+
+Ver [`studies/README.md`](studies/README.md) para o que a forma tem de fazer e o que ela não
+consegue mostrar.
 
 ---
 
@@ -589,10 +597,10 @@ make check-all  # o acima mais toda figura documentada re-derivada
 make claims     # re-deriva todo número citado em um README
 ```
 
-**562 testes, 96% de cobertura de statements, separados por custo.** O `make check` roda 541
-deles em cerca de vinte e cinco segundos e é o que barra um push. Os 21 restantes re-resolvem os
+**563 testes, 96% de cobertura de statements, separados por custo.** O `make check` roda 541
+deles em cerca de vinte e cinco segundos e é o que barra um push. Os 22 restantes re-resolvem os
 problemas de roteirização, re-replicam as simulações, re-rodam os backtests de previsão e as
-políticas de estoque, e executam os doze scripts de exemplo para verificar toda figura citada
+políticas de estoque, e executam os doze exemplos e os dois estudos para verificar toda figura citada
 acima; levam de cinco a seis minutos, e não dependem da versão do interpretador — então a CI roda o portão rápido
 em Python 3.10 e 3.12 e a verificação de figuras uma vez.
 
