@@ -256,3 +256,9 @@ These are not tools and they matter more than an eleventh one:
   caller's behalf.
 - No tool ships without tests against hand-computed values, not only against its own output.
 - No real operational data, ever. See [`../DISCLAIMER.md`](../DISCLAIMER.md).
+- **One branch and one pull request per wave**, titled for the decision it delivers rather than for
+  its first commit. The pull request states what was built, what it demonstrates, how it is
+  verified and what is deliberately out of scope — the history is part of what the repository
+  shows, not bookkeeping around it.
+- Every figure quoted in any README is asserted in `tests/test_readme_claims.py`. A change that
+  moves a published number breaks the build instead of leaving the text quietly wrong.
