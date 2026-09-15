@@ -37,6 +37,7 @@ em silêncio.
 | `oplab.simulation` | Onde está a restrição, e o que aliviá-la compra? | [README](src/oplab/simulation/README.md) |
 | `oplab.routing` | Quanto custa uma entrega, e quais decisões o modelo consegue fechar? | [README](src/oplab/routing/README.md) |
 | `oplab.benchmark` | Qual unidade está abaixo, neutralizados porte e geografia? | [README](src/oplab/benchmark/README.md) |
+| `oplab.forecast` | A previsão supera não fazer nada, e como você saberia? | [README](src/oplab/forecast/README.md) |
 
 Mais três ferramentas estão planejadas. Sequência e regra de seleção em
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
@@ -62,7 +63,7 @@ print(service_sensitivity(dataset.order_lines))  # uma carteira, quatro convenç
 
 ---
 
-## Oito coisas que isso demonstra
+## Nove coisas que isso demonstra
 
 ### 1. Dezesseis pontos de nível de serviço sem mexer na operação
 
@@ -269,6 +270,47 @@ Detalhes no [README do módulo](src/oplab/benchmark/README.md).
 
 ---
 
+### 9. A métrica que está na meta não pode ser calculada nos dados para os quais é citada
+
+O MAPE é a métrica de acuracidade da maioria das metas de planejamento porque lê como
+percentual. Neste sortimento ele é definido em 58,4% das observações período a período e em
+**1,0% das séries sem um único período faltante** — divisão por realizado zero é indefinida, e em
+demanda intermitente zero é o realizado mais frequente. Todo MAPE reportado é, portanto, média
+sobre subconjunto filtrado, e o filtro remove justamente os itens difíceis de planejar. É também
+assimétrico na direção caríssima: prever cinco contra realizado de um dá 400%, prever zero dá
+100% — modelo calibrado em MAPE aprende a prever baixo.
+
+Com métrica livre de escala a comparação é possível, e produz três resultados que um business
+case precisa sobreviver. Sete métodos, origem móvel, contra uma regra sazonal de uma linha:
+
+| Segmento | Séries | Melhor método | MASE | Supera a regra em | Vence em |
+| --- | --- | --- | --- | --- | --- |
+| Regulares (≤50% de períodos vazios) | 260 | SBA | 0,9417 | **0,8%** | 54% das séries |
+| Esparsas (>50% de períodos vazios) | 140 | TSB | **1,0890** | 6,5% | 61% das séries |
+
+**O ganho disponível na metade previsível é de 0,8% com taxa de vitória de cara ou coroa** —
+proposta que promete grande ganho de acuracidade aqui promete algo que os dados não contêm. **Na
+metade esparsa nada chega a MASE < 1,0**, então nenhum método supera o benchmark naive da própria
+série e o plano honesto é decisão de disponibilidade, não previsão. E **o líder muda entre as
+metades**: um modelo para todo o sortimento erra em metade dele por construção.
+
+O quarto resultado é o que custa dinheiro em silêncio. A mesma previsão, medida por item-unidade
+e no total da rede:
+
+| Nível | Séries | MASE | Viés |
+| --- | --- | --- | --- |
+| Por SKU e unidade | 1.599 | 1,1605 | −0,0367 |
+| Total da rede | 1 | 0,8480 | **−58,6667** |
+
+Viés médio por série −0,036690 × 1.599 séries = −58,6667, que é o viés do total até o último
+dígito. **Agregar encolhe o erro em 27% e não toca no viés**, porque viés é aditivo e erro não é.
+Manchete de acuracidade é quase sempre número de um agregado; viés pequeno demais para discutir
+num item é o mesmo viés, sem diminuição, no armazém.
+
+Detalhes no [README do módulo](src/oplab/forecast/README.md).
+
+---
+
 ## Princípios de projeto
 
 **Validar na fronteira.** Toda função pública de KPI confere a entrada contra um contrato em
@@ -349,8 +391,12 @@ Ditas com clareza, porque as lacunas importam tanto quanto a cobertura:
 - O benchmarking só remove mix na dimensão pela qual você estratifica, ajusta sem explicar, e
   seu DEA é determinístico sem barra de erro. Ver o
   [README do módulo](src/oplab/benchmark/README.md).
-- Ainda não há previsão de demanda, process mining nem política de estoque. São o restante da
-  onda 4 do [`docs/ROADMAP.md`](docs/ROADMAP.md).
+- O módulo de previsão é harness de medição com baselines, não biblioteca de modelos: sete
+  regras de uma linha, sem ETS ou ARIMA, sem regressor exógeno e sem intervalo de previsão. Um
+  modelo sério pertence ao mesmo harness, comparado na mesma tabela. Ver o
+  [README do módulo](src/oplab/forecast/README.md).
+- Ainda não há process mining nem política de estoque. São o restante da onda 4 do
+  [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Desenvolvimento
 
@@ -361,11 +407,12 @@ make check-all  # o acima mais toda figura documentada re-derivada
 make claims     # re-deriva todo número citado em um README
 ```
 
-**366 testes, 95% de cobertura de statements, separados por custo.** O `make check` roda 351
-deles em cerca de vinte segundos e é o que barra um push. Os 15 restantes re-resolvem os
-problemas de roteirização, re-replicam as simulações e rodam os oito scripts de exemplo para
-verificar toda figura citada acima; levam onze minutos, e não dependem da versão do interpretador
-— então a CI roda o portão rápido em Python 3.10 e 3.12 e a verificação de figuras uma vez.
+**429 testes, 95% de cobertura de statements, separados por custo.** O `make check` roda 413
+deles em cerca de dez segundos e é o que barra um push. Os 16 restantes re-resolvem os problemas
+de roteirização, re-replicam as simulações, re-rodam os backtests de previsão e executam os nove
+scripts de exemplo para verificar toda figura citada acima; levam menos de seis minutos, e não dependem da
+versão do interpretador — então a CI roda o portão rápido em Python 3.10 e 3.12 e a verificação de
+figuras uma vez.
 
 O `make check` existe porque a alternativa falhou duas vezes: rodar o linter e esquecer o
 formatador, e rodar uma ferramenta local mais antiga que a instalada pela CI. As duas

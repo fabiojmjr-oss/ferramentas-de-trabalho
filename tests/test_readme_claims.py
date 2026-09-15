@@ -552,6 +552,144 @@ def test_benchmark_tables(full: Dataset) -> None:
     )
 
 
+def test_forecast_tables(full: Dataset) -> None:
+    """oplab/forecast/README.md: the metric cannot be computed, the headroom is under a percent,
+    the leader changes between segments, and bias survives aggregation intact."""
+    from oplab.forecast import (
+        BASELINES,
+        INTERMITTENT,
+        aggregate_panel,
+        backtest_panel,
+        mape_coverage,
+        season_feasibility,
+        summarise,
+        to_panel,
+    )
+
+    site_demand = full.demand.loc[full.demand["site"].astype(str) == "CD-SP"]
+
+    # One year of weekly data cannot support an annual season; a daily grid with season=7 can.
+    weekly = to_panel(site_demand, freq="W", key=("sku",))
+    assert weekly.shape[0] == 53
+    assert not season_feasibility(weekly.shape[0], season=52, min_train=40).usable
+
+    daily = to_panel(site_demand, freq="D", key=("sku",))
+    assert daily.shape[0] == 365
+    daily_check = season_feasibility(daily.shape[0], season=7, min_train=120, horizon=7, step=28)
+    assert daily_check.usable
+    assert daily_check.origins == 9
+
+    # MAPE is defined on most period-observations and on almost no complete series.
+    coverage = mape_coverage(daily.to_numpy())
+    assert coverage.period_coverage == pytest.approx(0.584, abs=5e-3)
+    assert coverage.series_coverage == pytest.approx(0.010, abs=5e-3)
+    assert coverage.undefined_series == 0
+    assert daily.shape[1] == 400
+
+    zero_share = (daily == 0).mean()
+    models = {**BASELINES, **INTERMITTENT}
+    assert len(models) == 7
+    kwargs = {"horizon": 7, "step": 28, "min_train": 120, "season": 7}
+
+    regular = daily[zero_share[zero_share <= 0.5].index]
+    sparse = daily[zero_share[zero_share > 0.5].index]
+    assert regular.shape[1] == 260
+    assert sparse.shape[1] == 140
+
+    scored = {}
+    for name, panel in {"regular": regular, "sparse": sparse}.items():
+        results = backtest_panel(panel, models, **kwargs)
+        assert results["origin"].nunique() == 9
+        scored[name] = summarise(results, panel, min_train=120, season=7).set_index("model")
+
+    # Every published row of both tables.
+    expected = {
+        "regular": {
+            "sba": (0.9417, 0.7886, 0.0047, 0.9917, 0.5423),
+            "tsb": (0.9455, 0.7902, 0.4792, 0.9956, 0.5154),
+            "croston": (0.9483, 0.7928, 0.4735, 0.9986, 0.5192),
+            "seasonal_naive": (0.9496, 0.9396, 0.4394, 1.0000, None),
+            "moving_average": (1.0060, 0.8484, 0.8379, 1.0593, 0.3808),
+            "naive": (1.6015, 1.5562, 5.9861, 1.6865, 0.1115),
+            "drift": (1.6185, 1.5760, 6.0130, 1.7044, 0.1000),
+        },
+        "sparse": {
+            "tsb": (1.0890, 0.7093, 0.0045, 0.9346, 0.6071),
+            "sba": (1.1400, 0.7053, 0.0108, 0.9783, 0.5286),
+            "seasonal_naive": (1.1653, 1.0780, 0.0146, 1.0000, None),
+            "moving_average": (1.1661, 0.7678, 0.0240, 1.0007, 0.5571),
+            "croston": (1.1686, 0.7068, 0.0185, 1.0029, 0.5000),
+            "naive": (1.5393, 1.1923, 0.0899, 1.3210, 0.5071),
+            "drift": (1.5632, 1.2052, 0.0923, 1.3415, 0.5000),
+        },
+    }
+    for segment, rows in expected.items():
+        summary = scored[segment]
+        for model, (mase_, rmsse_, bias_, relative, share) in rows.items():
+            row = summary.loc[model]
+            assert row["mase"] == pytest.approx(mase_, abs=5e-4), (segment, model)
+            assert row["rmsse"] == pytest.approx(rmsse_, abs=5e-4), (segment, model)
+            assert row["bias"] == pytest.approx(bias_, abs=5e-4), (segment, model)
+            assert row["relative_mase"] == pytest.approx(relative, abs=5e-4), (segment, model)
+            if share is None:
+                assert pd.isna(row["beats_reference_share"])
+            else:
+                assert row["beats_reference_share"] == pytest.approx(share, abs=5e-4)
+
+    # The headroom on the regular half, and the floor on the sparse half.
+    regular_summary = scored["regular"]
+    best_regular = regular_summary["mase"].idxmin()
+    assert best_regular == "sba"
+    gain = (
+        1
+        - regular_summary.loc[best_regular, "mase"]
+        / (regular_summary.loc["seasonal_naive", "mase"])
+    )
+    assert gain == pytest.approx(0.008, abs=5e-4)
+
+    sparse_summary = scored["sparse"]
+    assert sparse_summary["mase"].min() > 1.0
+    assert sparse_summary["mase"].idxmin() == "tsb"
+    assert 1 - sparse_summary.loc["tsb", "mase"] / sparse_summary.loc[
+        "seasonal_naive", "mase"
+    ] == pytest.approx(0.065, abs=5e-4)
+
+    # The leader changes across the segment cut - that is the finding, not a rounding artefact.
+    assert best_regular != sparse_summary["mase"].idxmin()
+
+    # The 5% correction removes 99% of Croston's bias.
+    croston_bias = regular_summary.loc["croston", "bias"]
+    sba_bias = regular_summary.loc["sba", "bias"]
+    assert 1 - abs(sba_bias) / abs(croston_bias) == pytest.approx(0.99, abs=5e-3)
+
+    # Aggregation shrinks error by 27% and leaves bias exactly alone.
+    panel = to_panel(full.demand, freq="D", key=("site", "sku"))
+    total = aggregate_panel(panel)
+    reference = {"seasonal_naive": BASELINES["seasonal_naive"]}
+    assert panel.shape[1] == 1599
+
+    fine = summarise(
+        backtest_panel(panel, reference, **kwargs), panel, min_train=120, season=7
+    ).set_index("model")
+    coarse = summarise(
+        backtest_panel(total, reference, **kwargs), total, min_train=120, season=7
+    ).set_index("model")
+
+    assert fine.loc["seasonal_naive", "mase"] == pytest.approx(1.1605, abs=5e-4)
+    assert coarse.loc["seasonal_naive", "mase"] == pytest.approx(0.8480, abs=5e-4)
+    assert 1 - coarse.loc["seasonal_naive", "mase"] / fine.loc["seasonal_naive", "mase"] == (
+        pytest.approx(0.269, abs=5e-4)
+    )
+
+    per_series_bias = fine.loc["seasonal_naive", "bias"]
+    assert per_series_bias == pytest.approx(-0.036690, abs=5e-7)
+    assert per_series_bias * panel.shape[1] == pytest.approx(-58.6667, abs=5e-4)
+    assert coarse.loc["seasonal_naive", "bias"] == pytest.approx(-58.6667, abs=5e-4)
+    assert per_series_bias * panel.shape[1] == pytest.approx(
+        coarse.loc["seasonal_naive", "bias"], abs=1e-8
+    )
+
+
 def test_examples_run_without_error() -> None:
     """The three example scripts are part of the deliverable; a broken one is a broken README."""
     import runpy
@@ -561,7 +699,7 @@ def test_examples_run_without_error() -> None:
 
     root = Path(__file__).resolve().parents[1]
     scripts = sorted((root / "examples").glob("*.py"))
-    assert len(scripts) == 8
+    assert len(scripts) == 9
 
     for script in scripts:
         captured, sys.stdout = sys.stdout, StringIO()

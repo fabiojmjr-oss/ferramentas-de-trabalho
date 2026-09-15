@@ -20,7 +20,7 @@ decision-neutral is left out.
 | 6 | Route optimiser | `oplab.routing` | What does a delivery cost under each fleet scenario? | 3 — done |
 | 7 | Multi-site benchmark | `oplab.benchmark` | Which site is genuinely underperforming once size and mix are held constant? | 4 — done |
 | 8 | Process mining | `oplab.mining` | What does the process actually do, as opposed to the flowchart? | 4 |
-| 9 | Forecast baseline | `oplab.forecast` | Does this forecast beat seasonal naive, measured honestly? | 4 |
+| 9 | Forecast baseline | `oplab.forecast` | Does this forecast beat seasonal naive, measured honestly? | 4 — done |
 | 10 | Inventory policy lab | `oplab.inventory` | What does each point of service level cost in working capital? | 4 |
 
 ## Wave 1 — foundation *(complete)*
@@ -144,11 +144,29 @@ drags the standard towards it.
 rework loops, and lead time against value-added time. A value stream map generated from data
 rather than from sticky notes.
 
-**Forecast baseline.** Rolling-origin backtesting that compares naive and seasonal-naive
-against ETS, ARIMA and gradient boosting, with explicit handling of intermittent demand
-(Croston, SBA, TSB) and scale-free error metrics — MASE and RMSSE, not MAPE. Built on
-`statsforecast` rather than from scratch. The position being taken is that a forecast project
-without an honest baseline is unmeasurable, and most of them do not have one.
+**Forecast baseline** *(complete — [module README](../src/oplab/forecast/README.md))*.
+Rolling-origin backtesting against naive, seasonal naive, moving average, drift, Croston, SBA and
+TSB, with scale-free error metrics — MASE and RMSSE, not MAPE. The position being taken is that a
+forecast project without an honest baseline is unmeasurable, and most of them do not have one.
+
+Two deliberate departures from the plan. **ETS, ARIMA and gradient boosting were dropped, and
+`statsforecast` with them.** The measured headroom on the forecastable half of this assortment is
+0.8% over a one-line rule with a 54% per-series win rate, so adding a heavier model would have
+produced a second number inside the same noise band and implied a precision the data does not
+support. What the module ships instead is the harness: any model, including those three, can be
+passed into `backtest_panel` and appear on the same table. Keeping the dependency surface at
+numpy and pandas was a side benefit, not the reason.
+
+Three findings came out of building it, none of them planned. **One year of weekly data cannot
+support an annual seasonal baseline and nothing warns you** — `seasonal_naive` silently falls
+back to `naive` when the history is shorter than a season and every scaled metric returns `nan`,
+which is how a report ends up with a number under a heading that is false. That produced
+`season_feasibility()`, which is the check that belongs before any model is fitted. **The leader
+changes between the regular and sparse segments** (SBA and TSB respectively), so the best model
+is a property of the segment rather than of the assortment. And **bias is additive under
+aggregation where error is not**: mean bias per series times 1,599 series equals the bias of the
+network total to the last digit, while MASE improves 27% at total level. That last one is the
+result with the largest inventory consequence and it is the one least often stated.
 
 **Inventory policy lab.** Safety stock from demand *and* lead time variability, comparing
 `(s,Q)`, `(R,S)` and periodic review, with Monte Carlo simulation of stockout and fill rate.

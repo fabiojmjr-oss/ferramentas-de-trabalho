@@ -37,6 +37,7 @@ one silently.
 | `oplab.simulation` | Where is the constraint, and what does relieving it buy? | [README](src/oplab/simulation/README.md) |
 | `oplab.routing` | What does a delivery cost, and which decisions can the model settle? | [README](src/oplab/routing/README.md) |
 | `oplab.benchmark` | Which site is underperforming once size and geography are held constant? | [README](src/oplab/benchmark/README.md) |
+| `oplab.forecast` | Does the forecast beat doing nothing, and how would you know? | [README](src/oplab/forecast/README.md) |
 
 Three more tools are planned. Build sequence and selection rule in
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
@@ -62,7 +63,7 @@ print(service_sensitivity(dataset.order_lines))  # one order book, four conventi
 
 ---
 
-## Eight things it demonstrates
+## Nine things it demonstrates
 
 ### 1. A sixteen-point service spread with no change to the operation
 
@@ -269,6 +270,47 @@ Details in the [module README](src/oplab/benchmark/README.md).
 
 ---
 
+### 9. The metric in the target cannot be computed on the data it is quoted for
+
+MAPE is the accuracy metric in most planning targets because it reads as a percentage. On this
+assortment it is defined on 58.4% of period-observations and on **1.0% of series without a
+single gap** — division by a zero actual is undefined, and on intermittent demand zero is the
+modal actual. Every reported MAPE is therefore an average over a filtered subset, and the filter
+removes exactly the items that are hard to plan. It is asymmetric in the expensive direction too:
+forecasting five against an actual of one scores 400%, forecasting zero scores 100%, so a model
+tuned on MAPE learns to forecast low.
+
+With a scale-free metric the comparison can be made, and it produces three results a business
+case has to survive. Seven methods, rolling origin, against a one-line seasonal rule:
+
+| Segment | Series | Best method | MASE | Beats the rule by | Wins on |
+| --- | --- | --- | --- | --- | --- |
+| Regular (≤50% empty periods) | 260 | SBA | 0.9417 | **0.8%** | 54% of series |
+| Sparse (>50% empty periods) | 140 | TSB | **1.0890** | 6.5% | 61% of series |
+
+**The headroom on the forecastable half is 0.8% and a coin-flip win rate** — a proposal
+promising a large accuracy gain here is promising something the data does not contain. **On the
+sparse half nothing reaches MASE < 1.0**, so no method beats that series' own naive benchmark
+and the honest plan is an availability decision rather than a forecast. And **the leader changes
+between the halves**: one model for the whole assortment is wrong on half of it by construction.
+
+The fourth result is the one that costs money quietly. Scoring the same forecast per item-site
+and at network total:
+
+| Level | Series | MASE | Bias |
+| --- | --- | --- | --- |
+| Per SKU and site | 1,599 | 1.1605 | −0.0367 |
+| Network total | 1 | 0.8480 | **−58.6667** |
+
+Mean bias per series −0.036690 × 1,599 series = −58.6667, which is the bias of the total to the
+last digit. **Aggregation shrinks error by 27% and leaves bias untouched**, because bias is
+additive and error is not. A headline accuracy figure is almost always an aggregate's figure; a
+bias too small to argue about on one item is the same bias, undiminished, on the warehouse.
+
+Details in the [module README](src/oplab/forecast/README.md).
+
+---
+
 ## Design principles
 
 **Validate at the boundary.** Every public KPI function checks its input against a contract in
@@ -344,8 +386,12 @@ Stated plainly, because the gaps matter as much as the coverage:
 - Benchmarking can only remove mix along a dimension you stratify by, adjusts without
   explaining, and its DEA is deterministic with no error bars. See the
   [module README](src/oplab/benchmark/README.md).
-- There is no demand forecasting, process mining or inventory policy work yet. Those are the
-  rest of wave 4 of [`docs/ROADMAP.md`](docs/ROADMAP.md).
+- The forecasting module is a measurement harness with baselines, not a model library: seven
+  one-line rules, no ETS or ARIMA, no exogenous regressors and no prediction intervals. A
+  serious model belongs in the same harness, compared on the same table. See the
+  [module README](src/oplab/forecast/README.md).
+- There is no process mining or inventory policy work yet. Those are the rest of wave 4 of
+  [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Development
 
@@ -356,11 +402,12 @@ make check-all  # the above plus every documented figure re-derived
 make claims     # re-derive every number quoted in a README
 ```
 
-**366 tests, 95% statement coverage, split by cost.** `make check` runs 351 of them in about
-twenty seconds and is what a push is gated on. The remaining 15 re-solve the routing problems,
-re-replicate the simulations and run all eight example scripts to verify every figure quoted
-above; they take eleven minutes, and they do not depend on the interpreter version, so CI runs
-the fast gate across Python 3.10 and 3.12 and the figure verification once.
+**429 tests, 95% statement coverage, split by cost.** `make check` runs 413 of them in about
+ten seconds and is what a push is gated on. The remaining 16 re-solve the routing problems,
+re-replicate the simulations, re-run the forecast backtests and execute all nine example scripts
+to verify every figure quoted above; they take under six minutes, and they do not depend on the
+interpreter version, so CI runs the fast gate across Python 3.10 and 3.12 and the figure
+verification once.
 
 `make check` exists because the alternative failed twice: running the linter but forgetting the
 formatter, and running a locally installed tool older than the one CI installs. Both turned a
