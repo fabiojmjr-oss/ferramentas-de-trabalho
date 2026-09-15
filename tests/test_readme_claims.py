@@ -1133,6 +1133,186 @@ def test_mining_tables(full: Dataset) -> None:
     )
 
 
+def test_forecast_error_to_stock_tables(full: Dataset) -> None:
+    """oplab/forecast/README.md and oplab/inventory/README.md: the metric that ranks forecasts is
+    not the metric that sizes stock, no method beats a training mean on this data, and a per-step
+    error table is a seasonality table when the origins are a whole number of seasons apart."""
+    import numpy as np
+
+    from oplab.forecast import (
+        BASELINES,
+        INTERMITTENT,
+        backtest_panel,
+        error_profile,
+        horizon_profile,
+        interval_coverage,
+        summarise,
+        to_panel,
+    )
+    from oplab.inventory import (
+        compare_sizing_bases,
+        fit_demand,
+        fit_lead_time,
+        z_for_cycle_service,
+    )
+
+    def mean_forecast(history: np.ndarray, horizon: int) -> np.ndarray:
+        return np.full(horizon, float(np.mean(history)) if history.size else 0.0)
+
+    panel = to_panel(
+        full.demand.loc[full.demand["site"].astype(str) == "CD-SP"], freq="D", key=("sku",)
+    )
+    regular = panel.loc[:, (panel == 0).mean() <= 0.5]
+    assert regular.shape[1] == 260
+
+    models = {**BASELINES, **INTERMITTENT, "mean": mean_forecast}
+    results = backtest_panel(regular, models, horizon=7, step=28, min_train=120, season=7)
+    ranked = summarise(results, regular, min_train=120, season=7).set_index("model")
+
+    # Finding 1: the two metrics rank the same winner and disagree on the order below it.
+    expected = {
+        "mean": (0.9415, 2.6419, 3.2762, 0.3462),
+        "sba": (0.9417, 2.7147, 3.3007, 0.4731),
+        "tsb": (0.9455, 2.7116, 3.2945, 0.4731),
+        "croston": (0.9483, 2.7417, 3.3046, 0.4385),
+        "seasonal_naive": (0.9496, 2.7698, 4.0904, 0.1885),
+        "naive": (1.6015, 4.6508, 5.6971, 0.0500),
+    }
+    profiles = {}
+    for model, (mase_, mae_, sd_, reduces) in expected.items():
+        profile = error_profile(results, model)
+        profiles[model] = profile
+        assert ranked.loc[model, "mase"] == pytest.approx(mase_, abs=5e-4), model
+        assert profile["mae"].median() == pytest.approx(mae_, abs=5e-4), model
+        assert profile["sd"].median() == pytest.approx(sd_, abs=5e-4), model
+        assert profile["reduces_buffer"].mean() == pytest.approx(reduces, abs=5e-4), model
+
+    # A forecast of the training mean has the lowest error spread of the seven, so nothing here
+    # reduces the buffer. That is the whole finding, and it is asserted rather than described.
+    spreads = {model: float(profile["sd"].median()) for model, profile in profiles.items()}
+    assert min(spreads, key=lambda m: spreads[m]) == "mean"
+    assert ranked["mase"].idxmin() == "mean"
+
+    # The mechanism: absolute error compresses what the spread exposes, by a factor of five.
+    reference_mae = profiles["mean"]["mae"].median()
+    reference_sd = profiles["mean"]["sd"].median()
+    seasonal_mae = profiles["seasonal_naive"]["mae"].median() / reference_mae - 1
+    seasonal_sd = profiles["seasonal_naive"]["sd"].median() / reference_sd - 1
+    assert seasonal_mae == pytest.approx(0.0484, abs=5e-4)
+    assert seasonal_sd == pytest.approx(0.2485, abs=5e-4)
+    assert seasonal_sd / seasonal_mae == pytest.approx(5.1, abs=5e-2)
+    # And MASE puts it under a point behind the leader on the same data.
+    assert ranked.loc["seasonal_naive", "mase"] / ranked.loc["mean", "mase"] - 1 == pytest.approx(
+        0.009, abs=5e-4
+    )
+
+    # Finding 2: the two sizings come to the same number, because the ratio is one.
+    sba = profiles["sba"]
+    assert sba["sd_ratio"].median() == pytest.approx(1.0019, abs=5e-4)
+    assert sba["reduces_buffer"].mean() == pytest.approx(0.4731, abs=5e-4)
+
+    orders = full.purchase_orders
+    supplier_of = orders.drop_duplicates("sku").set_index("sku")["supplier"]
+    lead_times = {
+        name: fit_lead_time(
+            group["lead_days"].to_numpy(), quoted=float(group["quoted_lead_days"].iloc[0])
+        )
+        for name, group in orders.groupby("supplier")
+    }
+    z = z_for_cycle_service(0.95)
+    sku = regular.sum().sort_values(ascending=False).index[20]
+    assert sku == "SKU-00345"
+    demand = fit_demand(regular[sku].to_numpy())
+    indexed = sba.set_index("series")
+    assert demand.sd == pytest.approx(14.21, abs=5e-3)
+    assert indexed.loc[sku, "sd"] == pytest.approx(12.96, abs=5e-3)
+
+    bases = compare_sizing_bases(
+        demand,
+        lead_times[supplier_of[sku]],
+        error_sd=float(indexed.loc[sku, "sd"]),
+        error_bias=float(indexed.loc[sku, "bias"]),
+        z=z,
+    ).set_index("basis")
+    assert bases.loc["demand variability", "safety_units"] == pytest.approx(231.6882, abs=5e-4)
+    assert bases.loc["forecast error", "safety_units"] == pytest.approx(225.4522, abs=5e-4)
+    assert bases.loc["forecast error", "change_vs_demand"] == pytest.approx(-0.0269, abs=5e-4)
+
+    # Finding 3: a near-zero average bias hides per-series bias in both directions.
+    expected_bias = {
+        "sba": (0.0047, 0.5231, -0.7224),
+        "croston": (0.4735, 0.2846, -0.6673),
+        "tsb": (0.4792, 0.2846, -0.6566),
+    }
+    for model, (mean_bias, under_share, bias_when_under) in expected_bias.items():
+        profile = profiles[model]
+        under = profile.loc[profile["bias"] < 0.0]
+        assert profile["bias"].mean() == pytest.approx(mean_bias, abs=5e-4), model
+        assert (profile["bias"] < 0.0).mean() == pytest.approx(under_share, abs=5e-4), model
+        assert under["bias"].mean() == pytest.approx(bias_when_under, abs=5e-4), model
+    # SBA's mean bias is near zero and it still under-forecasts more than half the assortment.
+    assert abs(profiles["sba"]["bias"].mean()) < 0.01
+    assert (profiles["sba"]["bias"] < 0.0).mean() > 0.5
+
+    croston = profiles["croston"].set_index("series")
+    worst = croston.loc[croston["bias"] < 0.0, "bias"].idxmin()
+    assert worst == "SKU-00139"
+    worst_demand = fit_demand(regular[worst].to_numpy())
+    charged = compare_sizing_bases(
+        worst_demand,
+        lead_times[supplier_of[worst]],
+        error_sd=float(croston.loc[worst, "sd"]),
+        error_bias=float(croston.loc[worst, "bias"]),
+        z=z,
+    ).set_index("basis")
+    charge = (
+        charged.loc["forecast error", "safety_units"]
+        - charged.loc["forecast error, bias uncorrected", "safety_units"]
+    )
+    uncorrected = charged.loc["forecast error, bias uncorrected", "safety_units"]
+    assert croston.loc[worst, "bias"] == pytest.approx(-13.27, abs=5e-3)
+    assert charge == pytest.approx(103.2, abs=5e-2)
+    assert charge / uncorrected == pytest.approx(0.32, abs=5e-3)
+
+    # Finding 4: the horizon table is phase-locked, and the pattern reproduces at every origin.
+    profile = horizon_profile(results, "sba", step_between_origins=28, season=7)
+    assert bool(profile["phase_locked"].all())
+    indexed_steps = profile.set_index("step")
+    assert indexed_steps.loc[1, "sd"] == pytest.approx(10.4237, abs=5e-4)
+    assert indexed_steps.loc[4, "sd"] == pytest.approx(14.0836, abs=5e-4)
+    assert indexed_steps.loc[4, "bias"] == pytest.approx(8.0844, abs=5e-4)
+    # The square-root rule would ask for 2.0 at step 4 and the data gives 1.35.
+    assert indexed_steps.loc[4, "sqrt_step"] == pytest.approx(2.0)
+    assert indexed_steps.loc[4, "sd_vs_step_1"] == pytest.approx(1.3511, abs=5e-4)
+    assert not profile["sd"].is_monotonic_increasing
+
+    cells = (
+        results.loc[results["model"] == "sba"]
+        .assign(error=lambda f: f["forecast"] - f["actual"])
+        .groupby(["origin", "step"])["error"]
+        .mean()
+        .unstack("step")
+    )
+    assert len(cells) == 9
+    systematic = cells.mean()
+    between = cells.std(ddof=1)
+    # A systematic spread of eleven units between steps against about one unit between origins:
+    # the pattern is the backtest's geometry, not sampling noise.
+    assert systematic.max() == pytest.approx(8.08, abs=5e-3)
+    assert systematic.min() == pytest.approx(-3.88, abs=5e-3)
+    assert between.loc[4] == pytest.approx(1.03, abs=5e-3)
+    assert between.max() < 1.5
+    assert systematic.max() - systematic.min() > 7 * between.max()
+
+    # And the normal interval over-covers while missing asymmetrically.
+    coverage = interval_coverage(results, "sba", 0.95).set_index("step")
+    assert coverage.loc[3, "normal_coverage"] == pytest.approx(0.9688, abs=5e-5)
+    assert coverage.loc[3, "normal_below"] == pytest.approx(0.0295, abs=5e-5)
+    assert coverage.loc[3, "normal_above"] == pytest.approx(0.0017, abs=5e-5)
+    assert (coverage["normal_coverage"] > 0.95).all()
+    assert coverage["empirical_coverage"].to_numpy() == pytest.approx(0.9496, abs=5e-5)
+
+
 def test_examples_run_without_error() -> None:
     """The three example scripts are part of the deliverable; a broken one is a broken README."""
     import runpy
@@ -1142,7 +1322,7 @@ def test_examples_run_without_error() -> None:
 
     root = Path(__file__).resolve().parents[1]
     scripts = sorted((root / "examples").glob("*.py"))
-    assert len(scripts) == 11
+    assert len(scripts) == 12
 
     for script in scripts:
         captured, sys.stdout = sys.stdout, StringIO()

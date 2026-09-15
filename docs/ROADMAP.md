@@ -112,7 +112,9 @@ not the 8.8% the under-searched solve reported, because a heuristic given too li
 struggles more with the constrained problem than with the open one and therefore overstates the
 cost of every constraint priced with it.
 
-Wave 3 is closed. Wave 4 is closed: the generator and all ten tools are built.
+Wave 3 is closed. Wave 4 is closed: the generator and all ten tools are built. Wave 5 deepens
+rather than adds - the tool list is complete, and what is left is the connections between the
+tools, which is where the mistakes were hiding.
 
 ## Wave 4 — differentiation
 
@@ -236,6 +238,53 @@ contains few replenishment cycles, so the opening assumption is a large share of
 warm-up of two cycles collapses the spread to 1.2 points. It was believable in both directions,
 which is what made it dangerous, so `warmup` defaults to a computed value rather than to zero and
 the range is asserted in the claim tests.
+
+
+## Wave 5 — connections
+
+The tool count stops at ten on purpose. What wave 5 does instead is join modules that were built
+separately and check whether they agree, which turned out to be the most productive thing in the
+project so far: the first connection attempted found an error in work that had already shipped.
+
+**Forecast error to safety stock** *(complete — [`oplab.forecast`](../src/oplab/forecast/README.md),
+[`oplab.inventory`](../src/oplab/inventory/README.md))*.
+
+`oplab.forecast` ranked forecasts on MASE. `oplab.inventory` sized safety stock on the standard
+deviation of demand. Each is defensible alone and **together they are incoherent**: if replenishment
+is driven by a forecast, the quantity to buffer is the error of that forecast, and sizing on demand
+variability silently assumes the forecast is the long-run mean. That was a real defect in shipped
+code, found by asking the two modules the same question rather than by reading either of them.
+
+The fix added `error_profile`, `horizon_profile`, `prediction_interval` and `interval_coverage` to
+`oplab.forecast`, and `safety_stock_from_forecast_error` and `compare_sizing_bases` to
+`oplab.inventory`. Four results came out of it:
+
+- **The metric that ranks a forecast is not the metric that sizes its stock.** `seasonal_naive`
+  reads 0.9% behind the leader on MASE and 24.9% worse on error spread — the quantity a buffer is
+  sized from. MASE is built on absolute error and a buffer has to cover the tail, so the spread
+  exposes 5.1 times what absolute error shows.
+- **A forecast of the training mean has the lowest error spread of the seven**, so on this data
+  nothing reduces the inventory buffer. Median ratio of forecast-error spread to demand spread:
+  1.0019. This reconciles with wave 4 rather than contradicting it — MASE measures against the
+  naive rule, inventory measures against the mean.
+- **A biased forecast is a cost no safety factor covers**, at 103.2 units of permanent stock (32%
+  of the buffer) on the worst under-forecast — and the average bias cannot size it, because SBA's
+  near-zero mean bias coexists with under-forecasting 52% of series.
+- **A per-horizon error table is a seasonality table when origins are a whole number of seasons
+  apart.** Step 4's error averages +8.08 and varies by 1.03 across nine origins: the pattern
+  reproduces every time, so it is geometry rather than noise. `horizon_profile` now returns a
+  `phase_locked` flag. The square-root rule also does not apply to a per-period error, only to a
+  cumulative one — which is why the sizing multiplies error *variance* by the protection interval
+  instead of reading a growth rate off that table.
+
+Two of my own hypotheses about that last finding were wrong before the third was right, and both
+are recorded in the module README rather than tidied away: a `step=25` run failed to disprove the
+phase-lock explanation, and a shared-demand-shock explanation was ruled out by reading the
+generator. What settled it was measuring the mean error per origin and per step and seeing the
+between-origin spread come out an order of magnitude below the between-step spread.
+
+**Still open in this wave.** An integrated study crossing every module on one synthetic operation
+and ending in a decision — the piece a reader would go through end to end rather than sampling.
 
 ## Cross-cutting
 

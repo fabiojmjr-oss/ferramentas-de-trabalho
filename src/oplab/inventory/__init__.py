@@ -12,6 +12,10 @@ than the arithmetic does:
 3. **A promised service level reported as an achieved one.** The formula is a normal
    approximation; :func:`simulate_policy` runs the policy on resampled demand and resampled
    lead times and reports what it delivered.
+4. **Demand variability used where forecast error belongs.** If replenishment is driven by a
+   forecast, the quantity to buffer is the error of that forecast, not the variability of the
+   demand. :func:`safety_stock_from_forecast_error` and :func:`compare_sizing_bases` measure the
+   difference, which runs in both directions depending on whether the forecast is worth having.
 
 Nothing here needs a solver or a statistics package: the three normal functions used are in
 :mod:`oplab.inventory.normal` and are tested against published values.
@@ -36,11 +40,13 @@ from .profile import (
 from .safety import (
     BASES,
     SafetyStock,
+    compare_sizing_bases,
     decompose_safety_stock,
     economic_order_quantity,
     expected_fill_rate,
     reorder_point,
     safety_stock,
+    safety_stock_from_forecast_error,
     z_for_cycle_service,
     z_for_fill_rate,
 )
@@ -63,6 +69,7 @@ __all__ = [
     "SafetyStock",
     "SimulationResult",
     "achieved_curve",
+    "compare_sizing_bases",
     "decompose_safety_stock",
     "economic_order_quantity",
     "empirical_quantile",
@@ -75,6 +82,7 @@ __all__ = [
     "norm_ppf",
     "reorder_point",
     "safety_stock",
+    "safety_stock_from_forecast_error",
     "service_curve",
     "simulate_policy",
     "unit_normal_loss",

@@ -65,7 +65,7 @@ print(service_sensitivity(dataset.order_lines))  # uma carteira, quatro convenç
 
 ---
 
-## Onze coisas que isso demonstra
+## Doze coisas que isso demonstra
 
 ### 1. Dezesseis pontos de nível de serviço sem mexer na operação
 
@@ -399,6 +399,53 @@ Detalhes no [README do módulo](src/oplab/mining/README.md).
 
 ---
 
+### 12. A métrica que ranqueia a previsão não é a que dimensiona o estoque
+
+Os achados 9 e 10 se sustentam sozinhos e foram construídos separados. Conectá-los expõe que nenhum
+dos dois responde à pergunta que a reposição de fato faz. O `oplab.forecast` ranqueia previsões por
+MASE; o `oplab.inventory` dimensionava estoque de segurança pela variabilidade da demanda. Ambos são
+defensáveis, e ambos respondem a uma pergunta diferente de *quanto pulmão esta previsão precisa?*
+
+**O MASE é construído sobre erro absoluto, e um pulmão tem de cobrir a cauda.** Medindo das duas
+formas contra uma previsão da média de treino:
+
+| Modelo | MASE | MAE vs média | Desvio do erro vs média |
+| --- | --- | --- | --- |
+| mean | 0,9415 | — | — |
+| sba | 0,9417 | +2,8% | +0,8% |
+| seasonal_naive | 0,9496 | +4,8% | **+24,9%** |
+
+O `seasonal_naive` lê **0,9% atrás do líder no MASE e um quarto pior** na grandeza da qual um pulmão
+é dimensionado — o desvio do erro expõe 5,1 vezes o que o erro absoluto mostra. Ranquear por uma
+métrica e dimensionar estoque por outra são duas decisões sobre duas definições de melhor.
+
+**E uma previsão da média de treino tem o menor desvio de erro entre as sete**, então nestes dados
+nada reduz o pulmão de estoque. A razão mediana entre desvio do erro e desvio da demanda é 1,0019; a
+previsão reduz o pulmão em 47% das séries e o aumenta no resto. Isso reconcilia com o achado 9 em
+vez de contradizê-lo: o MASE mede contra a regra *naive*, onde o SBA ganhava 0,8%, e o estoque mede
+contra a *média*, onde não há nada a ganhar.
+
+Duas consequências.
+
+**Previsão viesada é custo que nenhum fator de segurança cobre**, porque elevar `z` alarga uma janela
+que está no lugar errado. O pior sub-dimensionamento roda a −13,27 unidades/dia e cobra **103,2
+unidades de estoque permanente, 32% sobre um pulmão de 321 unidades.** E o viés médio não serve para
+dimensionar: o do SBA é +0,005 — quase zero — enquanto ele sub-dimensiona **52% das séries.** Estoque
+é mantido por item, então média centrada não é previsão centrada.
+
+**Uma tabela de erro por horizonte pode ser uma tabela de sazonalidade com rótulo errado.** O erro do
+passo 4 tem média +8,08 e varia só 1,03 entre nove origens, contra amplitude sistemática de −3,88 a
++8,08 entre passos — o padrão se reproduz em toda origem, então é geometria do backtest, não ruído.
+Origens a 28 períodos com sazonalidade 7 travam todo passo num dia da semana. O `horizon_profile`
+agora devolve um sinalizador `phase_locked`. A regra da raiz quadrada também não se aplica aqui:
+`sqrt(h)` descreve total acumulado, e a coluna medida vai de 0,77 a 1,35 enquanto `sqrt(passo)` vai
+de 1,00 a 2,65.
+
+Detalhes em [`oplab.forecast`](src/oplab/forecast/README.md) e
+[`oplab.inventory`](src/oplab/inventory/README.md).
+
+---
+
 ## Princípios de projeto
 
 **Validar na fronteira.** Toda função pública de KPI confere a entrada contra um contrato em
@@ -502,11 +549,11 @@ make check-all  # o acima mais toda figura documentada re-derivada
 make claims     # re-deriva todo número citado em um README
 ```
 
-**537 testes, 96% de cobertura de statements, separados por custo.** O `make check` roda 518
-deles em cerca de trinta segundos e é o que barra um push. Os 19 restantes re-resolvem os problemas
-de roteirização, re-replicam as simulações, re-rodam os backtests de previsão e as políticas de
-estoque, e executam os onze scripts de exemplo para verificar toda figura citada acima; levam
-cerca de seis minutos, e não dependem da versão do interpretador — então a CI roda o portão rápido
+**554 testes, 96% de cobertura de statements, separados por custo.** O `make check` roda 534
+deles em cerca de vinte e cinco segundos e é o que barra um push. Os 20 restantes re-resolvem os
+problemas de roteirização, re-replicam as simulações, re-rodam os backtests de previsão e as
+políticas de estoque, e executam os doze scripts de exemplo para verificar toda figura citada
+acima; levam cerca de sete minutos, e não dependem da versão do interpretador — então a CI roda o portão rápido
 em Python 3.10 e 3.12 e a verificação de figuras uma vez.
 
 O `make check` existe porque a alternativa falhou duas vezes: rodar o linter e esquecer o

@@ -19,3 +19,13 @@ def as_float(value: Any) -> float:
     machine and not another.
     """
     return float(np.asarray(value, dtype=float).item())
+
+
+def as_int(value: Any) -> int:
+    """Coerce a pandas or numpy scalar to a plain int.
+
+    The integer counterpart of :func:`as_float`, and needed for the same reason: a groupby key
+    arrives with a union type wide enough to include dates and strings, so a bare ``int()`` on it
+    type-checks only where the stubs happen to narrow it.
+    """
+    return int(np.asarray(value).item())

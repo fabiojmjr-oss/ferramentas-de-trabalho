@@ -64,7 +64,7 @@ print(service_sensitivity(dataset.order_lines))  # one order book, four conventi
 
 ---
 
-## Eleven things it demonstrates
+## Twelve things it demonstrates
 
 ### 1. A sixteen-point service spread with no change to the operation
 
@@ -399,6 +399,53 @@ Details in the [module README](src/oplab/mining/README.md).
 
 ---
 
+### 12. The metric that ranks a forecast is not the metric that sizes its stock
+
+Findings 9 and 10 each stand alone and were built separately. Connecting them exposes that neither
+answers the question replenishment actually asks. `oplab.forecast` ranks forecasts on MASE;
+`oplab.inventory` sized safety stock on the variability of demand. Both are defensible, and both
+are answering a different question from *how much buffer does this forecast need?*
+
+**MASE is built on absolute error, and a buffer has to cover the tail.** Scored both ways against a
+forecast of the training mean:
+
+| Model | MASE | MAE vs mean | Error sd vs mean |
+| --- | --- | --- | --- |
+| mean | 0.9415 | — | — |
+| sba | 0.9417 | +2.8% | +0.8% |
+| seasonal_naive | 0.9496 | +4.8% | **+24.9%** |
+
+`seasonal_naive` reads **0.9% behind the leader on MASE and a quarter worse** on the quantity a
+buffer is sized from — the error spread exposes 5.1 times what absolute error shows. Ranking on one
+metric and then sizing stock on another is two decisions taken on two definitions of better.
+
+**And a forecast of the training mean has the lowest error spread of the seven**, so on this data
+nothing reduces the inventory buffer. The median ratio of forecast-error spread to demand spread is
+1.0019; the forecast reduces the buffer on 47% of series and enlarges it on the rest. That reconciles
+with finding 9 rather than contradicting it: MASE measures against the *naive* rule, where SBA won
+by 0.8%, and inventory measures against the *mean*, where there is nothing to win.
+
+Two consequences follow.
+
+**A biased forecast is a cost no safety factor covers**, because raising `z` widens a window that
+is in the wrong place. The worst under-forecast runs at −13.27 units a day and charges **103.2 units
+of permanent stock, 32% on top of a 321-unit buffer.** And the average bias cannot size it: SBA's
+mean bias is +0.005 — near zero — while it under-forecasts **52% of series.** Inventory is held per
+item, so a centred average is not a centred forecast.
+
+**A per-horizon error table can be a seasonality table wearing a horizon label.** Step 4's error
+averages +8.08 and varies by only 1.03 across nine origins, against a systematic spread of −3.88 to
++8.08 between steps — the pattern reproduces at every origin, so it is the backtest's geometry, not
+noise. Origins 28 periods apart with a season of 7 pin every horizon step to one weekday.
+`horizon_profile` now returns a `phase_locked` flag. The square-root rule does not apply here
+either: `sqrt(h)` describes a cumulative total, and the measured column runs 0.77 to 1.35 while
+`sqrt(step)` runs 1.00 to 2.65.
+
+Details in [`oplab.forecast`](src/oplab/forecast/README.md) and
+[`oplab.inventory`](src/oplab/inventory/README.md).
+
+---
+
 ## Design principles
 
 **Validate at the boundary.** Every public KPI function checks its input against a contract in
@@ -497,10 +544,11 @@ make check-all  # the above plus every documented figure re-derived
 make claims     # re-derive every number quoted in a README
 ```
 
-**537 tests, 96% statement coverage, split by cost.** `make check` runs 518 of them in about
-thirty seconds and is what a push is gated on. The remaining 19 re-solve the routing problems,
+**554 tests, 96% statement coverage, split by cost.** `make check` runs 534 of them in about
+twenty-five seconds and is what a push is gated on. The remaining 20 re-solve the routing problems,
 re-replicate the simulations, re-run the forecast backtests and the inventory policy runs, and
-execute all eleven example scripts to verify every figure quoted above; they take about six minutes.
+execute all twelve example scripts to verify every figure quoted above; they take about seven
+minutes.
 They do not depend on the interpreter version, so CI runs the fast gate across Python 3.10 and 3.12
 and the figure verification once.
 
