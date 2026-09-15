@@ -481,6 +481,7 @@ tools were built.
 | [`03_audit_a_proposal.py`](studies/03_audit_a_proposal.py) | A vendor proposal with four workstreams and 18% on the cover: can any of it be reproduced on this operation's data? |
 | [`04_commit_to_a_promise.py`](studies/04_commit_to_a_promise.py) | A customer wants 99% fill rate with penalties: what is actually being signed, and at what cost? |
 | [`05_decide_before_you_know.py`](studies/05_decide_before_you_know.py) | A supplier failed and the expedite window shuts at noon: of four analyses, which could change what we do? |
+| [`06_the_decision_you_take_every_week.py`](studies/06_the_decision_you_take_every_week.py) | The same replenishment review, 52 times a year: what changes when the decision is a policy and not a case? |
 
 Study 01 declines two of the four on measurement rather than on budget, narrows the two it funds,
 and finds that the largest item is not on the list — 35% of the cost gap the brief opens with is
@@ -516,6 +517,16 @@ exposure by exactly nothing. So the highest-value act available at 07:00 is a ph
 module here produces. The decision still ships, because blanket action only overtakes acceptance at
 95 days of outage — outside every scenario on offer. **The value of information is bounded by the
 value of the decision it informs**, and that bound is computable before the analysis.
+
+Study 06 is the other half of 05's pair, and three things invert when the same decision is taken 52
+times. **Bias compounds while noise averages**, crossing at `n* = (sd/bias)²` — so MAE, which
+charges the two identically, elects `seasonal_naive` while the recurring decision elects `mean`, by
+2.4×; at a daily review all four models are bias-dominated. **The value of information scales with
+repetitions**: the half-day study 05 correctly refused against a BRL 202 one-off stake pays back
+here in 188 days and keeps paying. And **re-tuning weekly inverts its own signal** — a trailing
+90-day refit tracks demand already seen at +0.9773 and demand it must cover at **−0.3868**, buying
+0.22 points of fill rate for 199 units of churn. The instrument that says when to re-tune is the
+control chart, which finds one genuine level shift against forty calendar re-fits.
 
 See [`studies/README.md`](studies/README.md) for what the form has to do and what it cannot show.
 
@@ -619,12 +630,13 @@ make check-all  # the above plus every documented figure re-derived
 make claims     # re-derive every number quoted in a README
 ```
 
-**566 tests, 96% statement coverage, split by cost.** 541 of them run in about twenty-five
+**567 tests, 96% statement coverage, split by cost.** 541 of them run in about twenty-five
 seconds — under a minute for the whole `make check` sequence with the linters, the type check and
-coverage — and that is what a push is gated on. The remaining 25 re-solve the routing problems,
+coverage — and that is what a push is gated on. The remaining 26 re-solve the routing problems,
 re-replicate the simulations, re-run the forecast backtests and the inventory policy runs, and
-execute all twelve examples and all five studies to verify every figure quoted above; they take
-about eleven minutes (10m55s with study 05 added, against 10m18s and 10m19s before it).
+execute all twelve examples and all six studies to verify every figure quoted above; they take
+about eleven minutes (11m10s on the most recent run, against 10m18s before the routing
+budget sweep was pinned in wave 8).
 They do not depend on the interpreter version, so CI runs the fast gate across Python 3.10 and 3.12
 and the figure verification once.
 

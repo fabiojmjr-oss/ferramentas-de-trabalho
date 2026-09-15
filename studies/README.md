@@ -18,6 +18,7 @@ questions produce different work. The studies here are written for the second.
 | [`03_audit_a_proposal.py`](03_audit_a_proposal.py) | A vendor proposal with four workstreams and 18% on the cover: can any of it be reproduced on this operation's data? |
 | [`04_commit_to_a_promise.py`](04_commit_to_a_promise.py) | A customer wants 99% fill rate with penalties: what is actually being signed, and at what cost? |
 | [`05_decide_before_you_know.py`](05_decide_before_you_know.py) | A supplier failed and the expedite window shuts at noon: of four analyses, which could change what we do? |
+| [`06_the_decision_you_take_every_week.py`](06_the_decision_you_take_every_week.py) | The same replenishment review, 52 times a year: what changes when the decision is a policy and not a case? |
 
 The set is deliberate. Study 01 asks *what should I fund?* — a comparison, decided by pricing
 candidates. Study 02 asks *what changed?* — an elimination, decided by establishing which signals
@@ -95,6 +96,46 @@ The framework the study ends on is **the value of information is bounded by the 
 decision it informs** — computable before the analysis, from the action space alone, and the one
 calculation a Monday morning never includes.
 
+Study 06 is the other half of study 05's pair, and it is the pair that carries the point rather
+than either study alone. Study 05 had one decision under a clock and cancelled most of the
+analysis. This one has the same decision 52 times, and three things invert.
+
+**Bias compounds; noise averages.** A systematic error is paid every period and accumulates as
+`n × bias`, while a random one cancels against itself and accumulates as `sqrt(n) × sd`. They cross
+at **`n* = (sd / bias)²`**, which is the only quantity in the comparison that knows how often the
+decision is taken. Mean absolute error charges bias and noise identically, so it cannot answer the
+question a policy asks — and here the two rankings disagree: **MAE elects `seasonal_naive` (3.143);
+the recurring decision elects `mean`, whose bias takes 2.4× as many repetitions to overtake its own
+noise.** At 52 decisions a year two of the four models are already bias-dominated; at 365, all four
+are. So the review frequency decides which metric the model should have been selected on.
+`drift` is the instructive case: its MAE is 1.89× the best, which reads as mediocre rather than
+disqualifying, and its bias overtakes its noise after **3.3 periods**.
+
+**The value of information scales with the repetitions.** Selecting on the wrong metric holds BRL
+7,074 more of safety capital, BRL 1,556 a year at a 22% holding rate. The half-day study 05
+correctly refused — because it would have decided BRL 202 once — pays back here in **188 days** and
+then keeps paying. Nothing about the analysis changed; the repetition count changed.
+
+**Re-tuning is not free improvement.** Re-fitting the demand profile weekly on a trailing 90 days
+moves the safety level across a **40% range** and tracks the demand already seen at **+0.9773** —
+and the demand it actually has to cover at **−0.3868**. It does not lag the signal, it inverts it:
+raising the level after the peak and cutting it after the trough. A policy moving at random would
+score zero, so a negative score makes the re-tuning worse than leaving the level alone. The whole
+swing buys **0.22 points of fill rate** for 199 units of stock moved back and forth across 39
+re-tunes, and sizing once lands inside the span at none of the cost.
+
+**The instrument that says when to re-tune is the control chart, not the forecast.** The same
+series as weekly totals shows **one** point beyond three sigma against eleven run and zone signals
+and a moving range with no signals at all — a stable spread with an oscillating level, which is
+exactly the condition under which a trailing estimator chases its own tail. One occasion on which
+the process said something had changed, against forty on which the calendar said to re-fit. A
+forecast asked every week what the level is will answer every week, because answering is what it
+does; only the chart is built to say the question has no new answer yet.
+
+The uncomfortable part: re-tuning weekly feels like diligence, and it is the most visible recurring
+analytical work an operation does. An operation that stopped would look less rigorous and be more
+accurate.
+
 ## What a study has to do
 
 - **Check the brief before pricing anything.** Two of the modules exist to establish whether a
@@ -138,6 +179,7 @@ perguntas produzem trabalhos diferentes. Os estudos aqui são escritos para a se
 | [`03_audit_a_proposal.py`](03_audit_a_proposal.py) | Uma proposta de fornecedor com quatro frentes e 18% na capa: alguma parte dela se reproduz nos dados desta operação? |
 | [`04_commit_to_a_promise.py`](04_commit_to_a_promise.py) | Um cliente quer 99% de fill rate com penalidade: o que está sendo assinado de fato, e a que custo? |
 | [`05_decide_before_you_know.py`](05_decide_before_you_know.py) | Um fornecedor falhou e a janela de expedição fecha ao meio-dia: das quatro análises, qual pode mudar o que fazemos? |
+| [`06_the_decision_you_take_every_week.py`](06_the_decision_you_take_every_week.py) | A mesma revisão de reposição, 52 vezes por ano: o que muda quando a decisão é política e não caso? |
 
 O conjunto é deliberado. O estudo 01 pergunta *no que devo investir?* — comparação, decidida
 precificando candidatos. O estudo 02 pergunta *o que mudou?* — eliminação, decidida estabelecendo
@@ -214,6 +256,47 @@ jogo depois que um embarque já falhou.
 O modelo com que o estudo termina: **o valor da informação é limitado pelo valor da decisão que ela
 informa** — calculável antes da análise, a partir do espaço de ações, e a única conta que uma
 segunda-feira nunca inclui.
+
+O estudo 06 é a outra metade do par do estudo 05, e é o par que carrega a tese, não cada estudo
+isolado. O 05 tinha uma decisão sob relógio e cancelou a maior parte da análise. Este tem a mesma
+decisão 52 vezes, e três coisas se invertem.
+
+**Viés acumula; ruído se cancela.** Um erro sistemático é pago todo período e acumula como
+`n × viés`, enquanto o aleatório se cancela e acumula como `sqrt(n) × sd`. Eles se cruzam em
+**`n* = (sd / viés)²`**, a única grandeza da comparação que sabe com que frequência a decisão é
+tomada. O erro absoluto médio cobra viés e ruído igualmente, então não responde à pergunta que uma
+política faz — e aqui os dois rankings discordam: **o MAE elege `seasonal_naive` (3,143); a decisão
+recorrente elege `mean`, cujo viés leva 2,4× mais repetições para superar o próprio ruído.** A 52
+decisões por ano, dois dos quatro modelos já são dominados por viés; a 365, todos os quatro. Ou
+seja: a frequência da revisão decide sobre qual métrica o modelo deveria ter sido escolhido.
+`drift` é o caso didático: MAE 1,89× o melhor, o que soa mediano e não desqualificante, e viés que
+supera o ruído em **3,3 períodos**.
+
+**O valor da informação escala com as repetições.** Escolher pela métrica errada mantém BRL 7.074
+a mais de capital de segurança, BRL 1.556 por ano a 22% de custo de carregamento. A meia-jornada
+que o estudo 05 corretamente recusou — porque decidiria BRL 202 uma vez — se paga aqui em **188
+dias** e segue pagando. Nada na análise mudou; a contagem de repetições mudou.
+
+**Re-calibrar não é melhoria de graça.** Re-ajustar o perfil de demanda toda semana numa janela
+móvel de 90 dias move o nível de segurança numa **amplitude de 40%** e acompanha a demanda já
+ocorrida a **+0,9773** — e a demanda que ele precisa cobrir a **−0,3868**. Não atrasa o sinal, o
+inverte: sobe o nível depois do pico e corta depois do vale. Uma política movendo-se ao acaso
+marcaria zero, então marcar abaixo de zero torna a re-calibração pior que deixar o nível parado.
+A amplitude inteira compra **0,22 ponto de fill rate** por 199 unidades de estoque movidas de um
+lado para o outro em 39 re-calibrações, e dimensionar uma vez cai dentro da faixa sem nenhum desses
+custos.
+
+**O instrumento que diz quando re-calibrar é a carta de controle, não a previsão.** A mesma série
+em totais semanais mostra **um** ponto além de três sigma contra onze sinais de corrida e zona, e
+uma amplitude móvel sem nenhum sinal — dispersão estável com nível oscilando, exatamente a condição
+em que um estimador de janela móvel persegue a própria cauda. Uma ocasião em que o processo disse
+que algo mudou, contra quarenta em que o calendário disse para re-ajustar. Uma previsão perguntada
+toda semana sobre o nível vai responder toda semana, porque responder é o que ela faz; só a carta
+foi construída para dizer que a pergunta ainda não tem resposta nova.
+
+A parte incômoda: re-calibrar toda semana parece diligência, e é o trabalho analítico recorrente
+mais visível que uma operação faz. Uma operação que parasse pareceria menos rigorosa e seria mais
+precisa.
 
 ### O que um estudo tem de fazer
 

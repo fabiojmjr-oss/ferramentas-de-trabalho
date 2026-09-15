@@ -508,6 +508,65 @@ decision it improves — and nobody checked the cap before assigning the work.
 **Wave 9 is closed.** The five studies now cover four positions a decision is reasoned from and,
 in this one, the constraint that decides which reasoning is affordable at all.
 
+## Wave 10 — reasoning about the decision you take every week
+
+Wave 9 put one decision under a clock and cancelled most of the analysis on the table. That result
+is only half an answer, because it says nothing about the decision an operation actually spends
+most of its analytical effort on: the recurring one. This wave is the other half, and the pair is
+what carries the point.
+
+**A policy study** *(complete —
+[`studies/06_the_decision_you_take_every_week.py`](../studies/06_the_decision_you_take_every_week.py))*.
+The weekly replenishment review across 191 SKUs at CD-SP, taken 52 times a year. Three things
+invert relative to the single-case posture.
+
+- **Bias compounds; noise averages.** A systematic error is paid every period and accumulates as
+  `n × bias`; a random one cancels against itself and accumulates as `sqrt(n) × sd`. They cross at
+  **`n* = (sd / bias)²`**, which is the only quantity in the comparison that knows how often the
+  decision is taken. Mean absolute error charges the two identically, so **the two rankings
+  disagree**: MAE elects `seasonal_naive` (3.143) while the recurring decision elects `mean`
+  (crossover 177.2 against 74.2), by a factor of 2.4. At 52 decisions a year `moving_average` and
+  `drift` are already bias-dominated; at 365, all four models are. The review frequency therefore
+  decides which metric the model should have been selected on — choosing a forecast without knowing
+  how often you will act on it is not an open modelling question, it is the selection criterion
+  left unspecified. `drift` is the instructive case: MAE only 1.89× the best, which reads as
+  mediocre rather than disqualifying, and a bias that overtakes its own noise after 3.3 periods.
+- **The value of information scales with the repetitions.** Selecting on the wrong metric holds
+  BRL 7,074 more of safety capital (+3.55%), or BRL 1,556 a year at a 22% holding rate. The
+  half-day of analysis wave 9 correctly refused — it would have decided BRL 202 once — pays back
+  here in **188 days** and then keeps paying. Nothing about the analysis changed; the repetition
+  count changed, and that quantity is not a property of the analysis at all.
+- **Re-tuning is not free improvement.** Re-fitting the demand profile weekly on a trailing 90 days
+  moves the safety level across a **40% range** and correlates with the demand already seen at
+  **+0.9773** and with the demand it actually has to cover at **−0.3868**. It does not lag the
+  signal, it inverts it: raising the level after the peak and cutting it after the trough. A policy
+  moving at random would score zero, so a negative score makes re-tuning worse than leaving the
+  level alone. The whole swing buys **0.22 points of fill rate** for 199 units of stock moved back
+  and forth across 39 re-tunes, and sizing once lands inside the span (0.9559 cycle service against
+  0.9284 and 0.9695) at none of the cost.
+- **The instrument that decides when to re-tune is the control chart, not the forecast.** The same
+  series as weekly totals shows one point beyond three sigma against eleven run and zone signals,
+  with no signals at all on the moving range: a stable spread with an oscillating level, which is
+  exactly the condition under which a trailing estimator chases its own tail. One occasion on which
+  the process said something had changed, against forty on which the calendar said to re-fit. A
+  forecast asked every week what the level is will answer every week, because answering is what it
+  does; only the chart is built to say the question has no new answer yet.
+
+**One hypothesis of mine was wrong and is recorded where it failed.** I set out to demonstrate the
+Deming funnel in its simple form — that the weekly re-tune chases common-cause variation on a
+process in control. The I-MR chart refused it: the level genuinely does move, with twelve signals.
+The correct finding is sharper than the one I went looking for. The signals are eleven run and zone
+patterns against a single beyond-three-sigma point, which is the signature of a mean-reverting
+series rather than one stepping to a new level — and a trailing estimator on a mean-reverting series
+does not merely fail to help, it inverts. The funnel was the right instinct about the wrong
+mechanism.
+
+**Wave 10 is closed.** The six studies now cover four positions a decision is reasoned from, and a
+pair that delimits the two postures by repetition count: what the clock permits when a decision
+happens once, and what repetition demands when it happens every week. The separating quantity is
+neither difficulty nor data quality, and it decides which metric is right, whether the analysis is
+worth buying, and whether adjusting is improvement or interference.
+
 ## Cross-cutting
 
 These are not tools and they matter more than an eleventh one:
