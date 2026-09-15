@@ -446,6 +446,28 @@ Detalhes em [`oplab.forecast`](src/oplab/forecast/README.md) e
 
 ---
 
+## Exemplos
+
+Doze scripts executáveis, cada um autocontido e cada um imprimindo o raciocínio por trás dos seus
+números, não apenas os números. Todos são executados pela suíte de testes.
+
+| Script | A pergunta que ele percorre |
+| --- | --- |
+| [`01_service_definition.py`](examples/01_service_definition.py) | Quanto de um número de serviço é definição, não desempenho |
+| [`02_process_control.py`](examples/02_process_control.py) | Carte o processo antes de julgá-lo capaz |
+| [`03_network_diagnostic.py`](examples/03_network_diagnostic.py) | Um diagnóstico de uma página de uma rede de quatro unidades |
+| [`04_slotting.py`](examples/04_slotting.py) | Quanto o endereçamento atual custa, e quanto é recuperável |
+| [`05_cost_variance.py`](examples/05_cost_variance.py) | Por que o custo por pedido mudou, e quem responde por cada parte |
+| [`06_capacity_simulation.py`](examples/06_capacity_simulation.py) | Onde está a restrição, e o que aliviá-la compra |
+| [`07_routing.py`](examples/07_routing.py) | Quanto custa uma entrega, e quais decisões o modelo fecha |
+| [`08_multi_site_benchmark.py`](examples/08_multi_site_benchmark.py) | Qual unidade está abaixo, neutralizados porte e geografia |
+| [`09_forecast_baseline.py`](examples/09_forecast_baseline.py) | Se a previsão supera não fazer nada, e como você saberia |
+| [`10_inventory_policy.py`](examples/10_inventory_policy.py) | Quanto custa um ponto de nível de serviço, e qual lever o compra |
+| [`11_process_mining.py`](examples/11_process_mining.py) | O que o processo faz, contra o que o fluxograma diz |
+| [`12_forecast_error_to_stock.py`](examples/12_forecast_error_to_stock.py) | Se prever reduz o estoque que você tem de manter |
+
+---
+
 ## Princípios de projeto
 
 **Validar na fronteira.** Toda função pública de KPI confere a entrada contra um contrato em
@@ -549,7 +571,7 @@ make check-all  # o acima mais toda figura documentada re-derivada
 make claims     # re-deriva todo número citado em um README
 ```
 
-**554 testes, 96% de cobertura de statements, separados por custo.** O `make check` roda 534
+**560 testes, 96% de cobertura de statements, separados por custo.** O `make check` roda 540
 deles em cerca de vinte e cinco segundos e é o que barra um push. Os 20 restantes re-resolvem os
 problemas de roteirização, re-replicam as simulações, re-rodam os backtests de previsão e as
 políticas de estoque, e executam os doze scripts de exemplo para verificar toda figura citada

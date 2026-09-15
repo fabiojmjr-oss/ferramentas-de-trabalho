@@ -446,6 +446,28 @@ Details in [`oplab.forecast`](src/oplab/forecast/README.md) and
 
 ---
 
+## Examples
+
+Twelve runnable scripts, each self-contained and each printing the reasoning behind its figures
+rather than only the figures. Every one of them is executed by the test suite.
+
+| Script | The question it works through |
+| --- | --- |
+| [`01_service_definition.py`](examples/01_service_definition.py) | How much of a service number is definition rather than performance |
+| [`02_process_control.py`](examples/02_process_control.py) | Chart the process before judging it capable |
+| [`03_network_diagnostic.py`](examples/03_network_diagnostic.py) | A one-page diagnostic of a four-site network |
+| [`04_slotting.py`](examples/04_slotting.py) | What the current slotting costs, and how much is recoverable |
+| [`05_cost_variance.py`](examples/05_cost_variance.py) | Why cost per order moved, and who owns each part of it |
+| [`06_capacity_simulation.py`](examples/06_capacity_simulation.py) | Where the constraint is, and what relieving it buys |
+| [`07_routing.py`](examples/07_routing.py) | What a delivery costs, and which decisions the model can settle |
+| [`08_multi_site_benchmark.py`](examples/08_multi_site_benchmark.py) | Which site underperforms once size and geography are held constant |
+| [`09_forecast_baseline.py`](examples/09_forecast_baseline.py) | Whether the forecast beats doing nothing, and how you would know |
+| [`10_inventory_policy.py`](examples/10_inventory_policy.py) | What a point of service level costs, and which lever buys it |
+| [`11_process_mining.py`](examples/11_process_mining.py) | What the process does, against what the flowchart says |
+| [`12_forecast_error_to_stock.py`](examples/12_forecast_error_to_stock.py) | Whether forecasting reduces the stock you have to hold |
+
+---
+
 ## Design principles
 
 **Validate at the boundary.** Every public KPI function checks its input against a contract in
@@ -544,7 +566,7 @@ make check-all  # the above plus every documented figure re-derived
 make claims     # re-derive every number quoted in a README
 ```
 
-**554 tests, 96% statement coverage, split by cost.** `make check` runs 534 of them in about
+**560 tests, 96% statement coverage, split by cost.** `make check` runs 540 of them in about
 twenty-five seconds and is what a push is gated on. The remaining 20 re-solve the routing problems,
 re-replicate the simulations, re-run the forecast backtests and the inventory policy runs, and
 execute all twelve example scripts to verify every figure quoted above; they take five to six
