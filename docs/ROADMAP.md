@@ -451,6 +451,63 @@ wrote nothing down has no answer either way.
 pricing your own candidates, sifting your own signals, reproducing somebody else's claim, and
 making a claim you will be held to.
 
+## Wave 9 — reasoning when the clock runs out first
+
+The four studies before this one share an assumption that is invisible until it is named: that the
+analysis can be finished before the decision is taken. That assumption is what makes them studies
+rather than Mondays.
+
+**A triage study** *(complete —
+[`studies/05_decide_before_you_know.py`](../studies/05_decide_before_you_know.py))*. A supplier's
+inbound failed over the weekend; 64 SKUs are affected; the airline's cut-off is noon. Four analyses
+are on the table and there is time for one. The reasoning is **boundary first, measurement
+second**: for each question, not "what is the answer?" but "what would the answer have to be to
+change what I do?"
+
+**The triage inverts the agenda.**
+
+- **The decision being argued about is worth BRL 202.** Air freight is charged by weight and the
+  shortfall it avoids is worth a margin on cost, so eligibility is a pure value-density test —
+  `margin x unit_cost > air_rate x weight` — which demand does not enter. Value density across the
+  affected range spans 1.76 to 250.29 BRL/kg, a factor of 142, and 3 of 64 SKUs clear the 62.5
+  BRL/kg threshold. Of those, one clears the fixed customs cost per line. Against BRL 41,893 of
+  exposure, the whole action space recovers **0.48%**. Blanket action costs BRL 311,853, of which
+  BRL 76,800 is customs before a kilo flies.
+- **The two factors that decide the outcome are nobody's action item.** Moving one factor at a
+  time: the length of the outage swings exposure **26.96x**, the demand estimate **8.04x**, gross
+  margin 2.40x, quoted-versus-realised lead time 1.14x, lead-time variability 1.01x. The air rate
+  and the customs fee — the two numbers the requested optimisation is built on — move it by
+  **exactly nothing**, because they price the response and not the loss. Sweeping the air rate
+  reorders the eligible list from 16 SKUs to 2 while leaving the exposure bit-identical.
+- **The highest-value act available at 07:00 is a phone call**, and no module in this repository
+  produces it. That is the honest limitation of a toolkit rather than a gap for a better model to
+  fill.
+- **The decision ships without the number that dominates it**, because the unknown never reaches
+  the boundary: blanket action overtakes acceptance only at **95 days** of outage — solved by
+  search rather than read off the table — which is outside every scenario on offer. The reversal
+  trigger is written down in advance, so reversing is a rule rather than a second argument.
+
+**Two of the study's own predictions were wrong**, and both are recorded in the script where they
+failed rather than quietly removed:
+
+- I expected the demand forecast to be decision-irrelevant, with an argument: demand cancels out of
+  the density test, so it cannot change which SKUs are eligible. The argument is correct and the
+  conclusion drawn from it was false. Demand cancels from the *selection* and dominates the
+  *exposure*. Selection was the question I had solved, so it was the question I let stand in for
+  the decision — which is the specific failure mode this study is about.
+- I expected the realised lead time to be the cheap decisive measurement. FORN-IMPORT quotes 30
+  days, realises 31.68, with skew 5.58 and a p95 of 36.88 — exactly the tail this repository was
+  built to find. It moves the exposure by 1.14x. The tail is real and it is not what is at stake
+  once a shipment has already failed: 21 days of delay swamp 1.7 days of optimism in a quote.
+
+The framework the study ends on is **the value of information is bounded by the value of the
+decision it informs**, computable before the analysis from the action space alone. At any
+defensible loaded rate, the half-day optimisation everyone wanted costs more than the BRL 202
+decision it improves — and nobody checked the cap before assigning the work.
+
+**Wave 9 is closed.** The five studies now cover four positions a decision is reasoned from and,
+in this one, the constraint that decides which reasoning is affordable at all.
+
 ## Cross-cutting
 
 These are not tools and they matter more than an eleventh one:
