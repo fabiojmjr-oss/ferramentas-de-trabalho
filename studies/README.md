@@ -14,6 +14,17 @@ questions produce different work. The studies here are written for the second.
 | Study | The decision it takes |
 | --- | --- |
 | [`01_where_to_spend.py`](01_where_to_spend.py) | Four funding candidates, one budget: which are worth the money once each is priced on the same data? |
+| [`02_what_changed.py`](02_what_changed.py) | Three signals on a Monday slide: which are real, which are artefacts of measurement, and is any action justified? |
+
+The pair is deliberate. Study 01 asks *what should I fund?* — a comparison, decided by pricing
+candidates. Study 02 asks *what changed?* — an elimination, decided by establishing which signals
+survive scrutiny. Those are the two questions an operations lead actually faces, and they require
+opposite reasoning: the first prices alternatives, the second discards hypotheses.
+
+Study 02 ends with **one investigation, two corrections to the reporting, and no recovery plan.**
+That is the harder output to defend and the more valuable one: reacting to a signal that is not one
+is not neutral, it moves a stable process. Every refusal there is backed by a measurement rather
+than by caution.
 
 ## What a study has to do
 
@@ -54,6 +65,18 @@ perguntas produzem trabalhos diferentes. Os estudos aqui são escritos para a se
 | Estudo | A decisão que ele toma |
 | --- | --- |
 | [`01_where_to_spend.py`](01_where_to_spend.py) | Quatro candidatos a investimento, um orçamento: quais valem o dinheiro, uma vez precificados nos mesmos dados? |
+| [`02_what_changed.py`](02_what_changed.py) | Três sinais num slide de segunda-feira: quais são reais, quais são artefato de medição, e alguma ação se justifica? |
+
+O par é deliberado. O estudo 01 pergunta *no que devo investir?* — comparação, decidida
+precificando candidatos. O estudo 02 pergunta *o que mudou?* — eliminação, decidida estabelecendo
+quais sinais sobrevivem ao escrutínio. São as duas perguntas que um gestor de operações realmente
+enfrenta, e exigem raciocínios opostos: o primeiro precifica alternativas, o segundo descarta
+hipóteses.
+
+O estudo 02 termina com **uma investigação, duas correções de relatório e nenhum plano de
+recuperação.** É a saída mais difícil de defender e a mais valiosa: reagir a um sinal que não é
+sinal não é neutro, move um processo estável. Toda recusa ali está apoiada numa medição, não em
+cautela.
 
 ### O que um estudo tem de fazer
 

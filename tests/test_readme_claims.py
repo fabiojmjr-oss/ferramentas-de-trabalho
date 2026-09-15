@@ -1457,6 +1457,105 @@ def test_study_one_reaches_the_verdicts_it_publishes(full: Dataset) -> None:
     assert 1 - capped / realised == pytest.approx(0.157, abs=5e-4)
 
 
+def test_study_two_refuses_the_actions_it_publishes(full: Dataset) -> None:
+    """studies/README.md and the root README: three of four slide items support no action.
+
+    A study whose conclusion is "do not act" has to be held to a higher standard than one that
+    recommends spending, because the cost of being wrong lands on nobody's budget. Each refusal
+    below rests on a figure, and every figure is pinned here.
+    """
+    from oplab.kpi import otif, service_sensitivity
+    from oplab.mining import waiting_ranked
+    from oplab.spc import (
+        capability_from_subgroups,
+        overdispersion_ratio,
+        p_chart,
+        xbar_r_chart,
+    )
+
+    all_rules = tuple(range(1, 9))
+    lines = full.order_lines.copy()
+    lines["month"] = pd.to_datetime(lines["order_ts"]).dt.to_period("M").astype(str)
+    served = lines.loc[lines["status"] != "cancelled"]
+    monthly = served.groupby("month").agg(lines=("line_id", "size"))
+    monthly["otif"] = otif(served, by="month")
+    monthly["failures"] = ((1.0 - monthly["otif"]) * monthly["lines"]).round().astype(int)
+
+    # Check 1: October is a signal, on a chart whose own assumption is violated.
+    assert len(monthly) == 12
+    assert monthly["otif"].idxmin() == "2025-10"
+    assert monthly.loc["2025-10", "otif"] == pytest.approx(0.7808, abs=5e-5)
+    assert monthly["otif"].idxmax() == "2025-12"
+    assert monthly.loc["2025-12", "otif"] == pytest.approx(0.7996, abs=5e-5)
+
+    chart = p_chart(monthly["failures"], monthly["lines"], rules=all_rules)
+    assert int(chart.out_of_control.sum()) == 1
+    assert bool(chart.out_of_control.loc["2025-10"])
+    worst_z = float(chart.violations.query("label == '2025-10'")["z"].max())
+    assert worst_z == pytest.approx(5.04, abs=5e-3)
+
+    ratio = overdispersion_ratio(chart)
+    assert ratio == pytest.approx(1.787, abs=5e-4)
+    # The signal survives the adjustment, which is why the refusal rests on scale rather than
+    # on dismissing it. Quoting the unadjusted figure is what the study refuses.
+    assert worst_z / ratio**0.5 == pytest.approx(3.77, abs=5e-3)
+    assert worst_z / ratio**0.5 > 3.0
+    # Limits about 0.8 points wide on ~24,000 lines a month.
+    assert (chart.ucl.max() - chart.center) * 100 == pytest.approx(0.8, abs=5e-2)
+    assert monthly["lines"].mean() == pytest.approx(23946, abs=1.0)
+
+    annual_range = float(monthly["otif"].max() - monthly["otif"].min())
+    conventions = service_sensitivity(full.order_lines)
+    convention_range = float(conventions["otif"].max() - conventions["otif"].min())
+    assert annual_range * 100 == pytest.approx(1.88, abs=5e-3)
+    assert convention_range * 100 == pytest.approx(15.57, abs=5e-3)
+    assert convention_range / annual_range == pytest.approx(8.3, abs=5e-2)
+
+    # Check 2: December's recovery is censoring. It is the only month with open lines.
+    status = lines.groupby("month")["status"].value_counts().unstack(fill_value=0)
+    unresolved = status["in_transit"] + status["open"]
+    assert int(unresolved.loc["2025-12"]) == 1636
+    assert int(unresolved.drop("2025-12").sum()) == 0
+    assert unresolved.loc["2025-12"] / status.loc["2025-12"].sum() == pytest.approx(0.063, abs=5e-4)
+
+    # Check 3: the process shift is real, locatable, and only visible from a clean baseline.
+    clean, ranges = xbar_r_chart(full.subgroups, baseline=slice(0, 40), rules=all_rules)
+    contaminated, _ = xbar_r_chart(full.subgroups, rules=all_rules)
+    first = clean.violations.query("position >= 40").sort_values("position").iloc[0]
+    assert int(first["label"]) == 43
+    assert first["z"] == pytest.approx(3.96, abs=5e-3)
+    assert int(first["rule"]) == 1
+    # The range chart is quiet, so the spread did not change - only the centre moved.
+    assert int(ranges.out_of_control.sum()) == 0
+    assert clean.center == pytest.approx(499.7155, abs=5e-4)
+    assert contaminated.center == pytest.approx(500.6674, abs=5e-4)
+    assert int(clean.out_of_control.iloc[:40].sum()) == 2
+    assert int(contaminated.out_of_control.iloc[:40].sum()) == 14
+
+    capability = capability_from_subgroups(full.subgroups, lsl=495.0, usl=505.0)
+    assert capability.cp == pytest.approx(0.820, abs=5e-4)
+    assert capability.pp == pytest.approx(0.657, abs=5e-4)
+    # Pp below Cp is the shift appearing as if it were incapability.
+    assert capability.pp < capability.cp
+
+    # Check 4: the two signals do not observe the same window, so no relationship is available.
+    stamps = full.subgroups.groupby("subgroup")["timestamp"].min()
+    span_h = (pd.Timestamp(stamps.iloc[-1]) - pd.Timestamp(stamps.iloc[0])).total_seconds() / 3600.0
+    assert len(stamps) == 60
+    assert span_h == pytest.approx(59.0, abs=0.5)
+    assert span_h / 24 == pytest.approx(2.5, abs=5e-2)
+    assert pd.Timestamp(stamps.iloc[0]).strftime("%Y-%m") == "2025-06"
+    assert pd.Timestamp(stamps.iloc[-1]).strftime("%Y-%m") == "2025-06"
+    # October is outside the process chart's window entirely.
+    assert not (
+        pd.Timestamp(stamps.iloc[0]) <= pd.Timestamp("2025-10-15") <= pd.Timestamp(stamps.iloc[-1])
+    )
+
+    # The standing target that needs no signal to justify it.
+    waiting = waiting_ranked(full.order_events).head(4)
+    assert waiting["share_of_waiting"].sum() == pytest.approx(0.754, abs=5e-4)
+
+
 def test_examples_and_studies_run_without_error() -> None:
     """The runnable scripts are part of the deliverable; a broken one is a broken README."""
     import runpy
@@ -1466,7 +1565,7 @@ def test_examples_and_studies_run_without_error() -> None:
 
     root = Path(__file__).resolve().parents[1]
     scripts = sorted((root / "examples").glob("*.py")) + sorted((root / "studies").glob("*.py"))
-    assert len(scripts) == 13
+    assert len(scripts) == 14
 
     for script in scripts:
         captured, sys.stdout = sys.stdout, StringIO()
