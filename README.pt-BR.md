@@ -478,6 +478,7 @@ que as ferramentas foram construídas.
 | --- | --- |
 | [`01_where_to_spend.py`](studies/01_where_to_spend.py) | Quatro candidatos a investimento, um orçamento: quais valem o dinheiro, uma vez precificados nos mesmos dados? |
 | [`02_what_changed.py`](studies/02_what_changed.py) | Três sinais num slide de segunda-feira: quais são reais, quais são artefato de medição, e alguma ação se justifica? |
+| [`03_audit_a_proposal.py`](studies/03_audit_a_proposal.py) | Uma proposta de fornecedor com quatro frentes e 18% na capa: alguma parte dela se reproduz nos dados desta operação? |
 
 O estudo 01 recusa dois dos quatro por medição, não por orçamento, estreita os dois que aprova, e
 descobre que o maior item não está na lista — 35% da diferença de custo com que o brief abre é
@@ -488,6 +489,13 @@ duas correções de relatório e nenhum plano de recuperação.** Três dos quat
 sustentavam ação, e um deles — o instinto de conectar um mês de serviço a um desvio de processo —
 é intestável, porque a carta de controle cobre 2,5 dias em junho e o número de serviço cobre doze
 meses. Dois sinais reais, nenhuma relação disponível.
+
+O estudo 03 audita a alegação de um terceiro em vez do material próprio, e **nenhuma das quatro
+frentes examinadas é simplesmente verdadeira ou simplesmente falsa**: uma está subdimensionada e
+não precisa do fornecedor, uma tem aproximadamente o número certo atribuído ao mecanismo errado,
+uma não é verificável pela classe de modelo que a produziu — inclusive o módulo de roteirização
+deste repositório — e uma aponta na direção certa para a parte errada do problema. Recusa sumária
+erraria em três linhas de quatro.
 
 Ver [`studies/README.md`](studies/README.md) para o que a forma tem de fazer e o que ela não
 consegue mostrar.
@@ -597,10 +605,10 @@ make check-all  # o acima mais toda figura documentada re-derivada
 make claims     # re-deriva todo número citado em um README
 ```
 
-**563 testes, 96% de cobertura de statements, separados por custo.** O `make check` roda 541
-deles em cerca de vinte e cinco segundos e é o que barra um push. Os 22 restantes re-resolvem os
+**564 testes, 96% de cobertura de statements, separados por custo.** O `make check` roda 541
+deles em cerca de vinte e cinco segundos e é o que barra um push. Os 23 restantes re-resolvem os
 problemas de roteirização, re-replicam as simulações, re-rodam os backtests de previsão e as
-políticas de estoque, e executam os doze exemplos e os dois estudos para verificar toda figura citada
+políticas de estoque, e executam os doze exemplos e os três estudos para verificar toda figura citada
 acima; levam de cinco a seis minutos, e não dependem da versão do interpretador — então a CI roda o portão rápido
 em Python 3.10 e 3.12 e a verificação de figuras uma vez.
 

@@ -1556,6 +1556,140 @@ def test_study_two_refuses_the_actions_it_publishes(full: Dataset) -> None:
     assert waiting["share_of_waiting"].sum() == pytest.approx(0.754, abs=5e-4)
 
 
+def test_study_three_reaches_the_verdicts_it_publishes(full: Dataset) -> None:
+    """studies/README.md and the root README: none of the four audited claims is simply true or
+    simply false, and the third verdict indicts this repository's own model class.
+
+    An audit is only worth the name if its numbers are reproducible, so each of the four verdicts
+    is pinned to the measurement it rests on - including the one that turns on the routing
+    module's search budget rather than on the data.
+    """
+    import numpy as np
+
+    from oplab.forecast import BASELINES, INTERMITTENT, backtest_panel, error_profile, to_panel
+    from oplab.inventory import fit_demand, fit_lead_time, safety_stock, z_for_cycle_service
+    from oplab.mining import flow_efficiency, waiting_ranked
+    from oplab.routing import one_day, solve
+    from oplab.routing.fleet import VAN
+    from oplab.slotting import (
+        abc_xyz,
+        compare_strategies,
+        cube_per_order_index,
+        demand_profile,
+        pick_counts,
+        reslot,
+    )
+    from oplab.synth import VALUE_ADDING
+
+    # Claim 1: understated. 70% is available against 30% claimed, and the rules sit 2.6 apart.
+    demand = full.demand.loc[full.demand["site"].astype(str) == "CD-PE"]
+    picks = pick_counts(full.order_lines, site="CD-PE")
+    classified = abc_xyz(demand_profile(demand, full.catalog, period="W"))
+    classified = classified.loc[classified.index.isin(picks.index)]
+    cube = full.catalog.set_index("sku")["case_volume_m3"]
+    table = compare_strategies(
+        picks,
+        full.layout,
+        {
+            "current (as received)": full.assignment,
+            "by revenue": reslot(-classified["annual_value"], full.layout, cube=cube),
+            "by popularity": reslot(-picks, full.layout, cube=cube),
+            "by cube-per-order index": reslot(
+                cube_per_order_index(picks, cube), full.layout, cube=cube
+            ),
+        },
+        baseline="current (as received)",
+    )
+    ranked = table.loc[table["strategy"] != "current (as received)"]
+    best = -float(ranked["change_vs_baseline"].min())
+    worst = -float(ranked["change_vs_baseline"].max())
+    assert best == pytest.approx(0.6967, abs=5e-4)
+    assert worst == pytest.approx(0.6709, abs=5e-4)
+    assert (best - worst) * 100 == pytest.approx(2.6, abs=5e-2)
+    # Understated: the data holds more than twice what the proposal claims.
+    assert best / 0.30 == pytest.approx(2.3, abs=5e-2)
+
+    # Claim 2: right number, wrong mechanism. Nothing in the forecast, ~16% from the supplier.
+    panel = to_panel(
+        full.demand.loc[full.demand["site"].astype(str) == "CD-SP"], freq="D", key=("sku",)
+    )
+    regular = panel.loc[:, (panel == 0).mean() <= 0.5]
+
+    def mean_forecast(history: np.ndarray, horizon: int) -> np.ndarray:
+        return np.full(horizon, float(np.mean(history)) if history.size else 0.0)
+
+    models = {
+        "mean": mean_forecast,
+        "sba": INTERMITTENT["sba"],
+        "seasonal_naive": BASELINES["seasonal_naive"],
+    }
+    results = backtest_panel(regular, models, horizon=7, step=28, min_train=120, season=7)
+    spreads = {name: float(error_profile(results, name)["sd"].median()) for name in models}
+    assert min(spreads, key=lambda name: spreads[name]) == "mean"
+    assert spreads["mean"] == pytest.approx(3.2762, abs=5e-4)
+    assert spreads["sba"] == pytest.approx(3.3007, abs=5e-4)
+    assert error_profile(results, "sba")["sd_ratio"].median() == pytest.approx(1.0019, abs=5e-4)
+
+    orders = full.purchase_orders
+    supplier_of = orders.drop_duplicates("sku").set_index("sku")["supplier"]
+    lead_times = {
+        name: fit_lead_time(
+            group["lead_days"].to_numpy(), quoted=float(group["quoted_lead_days"].iloc[0])
+        )
+        for name, group in orders.groupby("supplier")
+    }
+    z = z_for_cycle_service(0.95)
+    unit_cost = full.catalog.set_index("sku")["unit_cost"]
+    tight = panel.loc[:, (panel == 0).mean() <= 0.2]
+    realised = capped = 0.0
+    for sku in tight.columns:
+        supplier = supplier_of.get(sku)
+        if supplier is None:
+            continue
+        profile = fit_demand(tight[sku].to_numpy())
+        if profile.mean <= 0.0:
+            continue
+        lead = lead_times[supplier]
+        cost = float(unit_cost[sku])
+        realised += safety_stock(profile, lead, z).units * cost
+        tighter = fit_lead_time(np.minimum(lead.sample, lead.quantile(0.95)), quoted=lead.quoted)
+        capped += safety_stock(profile, tighter, z).units * cost
+    released = realised - capped
+    assert released == pytest.approx(30120, abs=1.0)
+    assert released / realised == pytest.approx(0.157, abs=5e-4)
+    # The vendor's 20% is close to what exists; the mechanism it is attributed to holds nothing.
+    assert 0.10 < released / realised < 0.25
+
+    # Claim 3: unverifiable. The search budget alone yields a larger saving than the claim.
+    problem = one_day(full.deliveries, "CD-SP", "2025-06-11")
+    cheap = solve(problem, VAN, solution_limit=20)
+    thorough = solve(problem, VAN, solution_limit=300)
+    assert cheap.cost_per_delivery == pytest.approx(44.08, abs=5e-3)
+    assert thorough.cost_per_delivery == pytest.approx(36.11, abs=5e-3)
+    assert cheap.vehicles_used == 7
+    assert thorough.vehicles_used == 5
+    budget_saving = 1 - thorough.cost_per_delivery / cheap.cost_per_delivery
+    assert budget_saving == pytest.approx(0.181, abs=5e-4)
+    # The whole verdict: an artefact of the method exceeds the claim it is asked to verify.
+    assert budget_saving > 0.15
+
+    # Claim 4: right direction, wrong part. Work is 6.5% of the lead time.
+    efficiency = flow_efficiency(full.order_events, VALUE_ADDING)
+    assert efficiency.busy_share == pytest.approx(0.0653, abs=5e-5)
+    assert efficiency.lead_h == pytest.approx(43.21, abs=5e-3)
+    assert efficiency.wait_h == pytest.approx(40.39, abs=5e-3)
+    assert efficiency.wait_h / efficiency.lead_h == pytest.approx(0.9347, abs=5e-5)
+    # Automating every step to zero cuts less than a third of the claim.
+    assert efficiency.busy_share < 0.25 / 3
+
+    waiting = waiting_ranked(full.order_events).head(4)
+    assert waiting["share_of_waiting"].sum() == pytest.approx(0.754, abs=5e-4)
+    halved = waiting["share_of_waiting"].head(2).sum() / 2 * efficiency.wait_h / efficiency.lead_h
+    assert halved == pytest.approx(0.23, abs=5e-3)
+    # Which is the claim, from the half of the problem the proposal does not address.
+    assert halved == pytest.approx(0.25, abs=0.03)
+
+
 def test_examples_and_studies_run_without_error() -> None:
     """The runnable scripts are part of the deliverable; a broken one is a broken README."""
     import runpy
@@ -1565,7 +1699,7 @@ def test_examples_and_studies_run_without_error() -> None:
 
     root = Path(__file__).resolve().parents[1]
     scripts = sorted((root / "examples").glob("*.py")) + sorted((root / "studies").glob("*.py"))
-    assert len(scripts) == 14
+    assert len(scripts) == 15
 
     for script in scripts:
         captured, sys.stdout = sys.stdout, StringIO()

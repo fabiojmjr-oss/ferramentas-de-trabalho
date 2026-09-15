@@ -15,8 +15,9 @@ questions produce different work. The studies here are written for the second.
 | --- | --- |
 | [`01_where_to_spend.py`](01_where_to_spend.py) | Four funding candidates, one budget: which are worth the money once each is priced on the same data? |
 | [`02_what_changed.py`](02_what_changed.py) | Three signals on a Monday slide: which are real, which are artefacts of measurement, and is any action justified? |
+| [`03_audit_a_proposal.py`](03_audit_a_proposal.py) | A vendor proposal with four workstreams and 18% on the cover: can any of it be reproduced on this operation's data? |
 
-The pair is deliberate. Study 01 asks *what should I fund?* — a comparison, decided by pricing
+The set is deliberate. Study 01 asks *what should I fund?* — a comparison, decided by pricing
 candidates. Study 02 asks *what changed?* — an elimination, decided by establishing which signals
 survive scrutiny. Those are the two questions an operations lead actually faces, and they require
 opposite reasoning: the first prices alternatives, the second discards hypotheses.
@@ -25,6 +26,18 @@ Study 02 ends with **one investigation, two corrections to the reporting, and no
 That is the harder output to defend and the more valuable one: reacting to a signal that is not one
 is not neutral, it moves a stable process. Every refusal there is backed by a measurement rather
 than by caution.
+
+Study 03 reasons about material the operation did not produce, which is a third shape again:
+adversarial reproduction. **None of the four claims it audits is simply true and none is simply
+false** — one is understated and needs no vendor, one has roughly the right number attached to the
+wrong mechanism, one cannot be verified by the class of model that produced it, and one points in
+the right direction at the wrong part of the problem. A flat rejection would have been wrong on
+three lines out of four.
+
+The third verdict is where that study turns on its own tooling: this repository's routing module is
+the same class of model as the one behind the vendor's number, and is subject to the same artefact.
+**An audit that finds nothing wrong with its own method is not an audit**, and saying so is what
+makes the other three verdicts worth reading.
 
 ## What a study has to do
 
@@ -66,8 +79,9 @@ perguntas produzem trabalhos diferentes. Os estudos aqui são escritos para a se
 | --- | --- |
 | [`01_where_to_spend.py`](01_where_to_spend.py) | Quatro candidatos a investimento, um orçamento: quais valem o dinheiro, uma vez precificados nos mesmos dados? |
 | [`02_what_changed.py`](02_what_changed.py) | Três sinais num slide de segunda-feira: quais são reais, quais são artefato de medição, e alguma ação se justifica? |
+| [`03_audit_a_proposal.py`](03_audit_a_proposal.py) | Uma proposta de fornecedor com quatro frentes e 18% na capa: alguma parte dela se reproduz nos dados desta operação? |
 
-O par é deliberado. O estudo 01 pergunta *no que devo investir?* — comparação, decidida
+O conjunto é deliberado. O estudo 01 pergunta *no que devo investir?* — comparação, decidida
 precificando candidatos. O estudo 02 pergunta *o que mudou?* — eliminação, decidida estabelecendo
 quais sinais sobrevivem ao escrutínio. São as duas perguntas que um gestor de operações realmente
 enfrenta, e exigem raciocínios opostos: o primeiro precifica alternativas, o segundo descarta
@@ -77,6 +91,18 @@ O estudo 02 termina com **uma investigação, duas correções de relatório e n
 recuperação.** É a saída mais difícil de defender e a mais valiosa: reagir a um sinal que não é
 sinal não é neutro, move um processo estável. Toda recusa ali está apoiada numa medição, não em
 cautela.
+
+O estudo 03 raciocina sobre material que a operação não produziu, uma terceira forma: reprodução
+adversarial. **Nenhuma das quatro alegações auditadas é simplesmente verdadeira e nenhuma é
+simplesmente falsa** — uma está subdimensionada e não precisa do fornecedor, uma tem
+aproximadamente o número certo atribuído ao mecanismo errado, uma não é verificável pela classe de
+modelo que a produziu, e uma aponta na direção certa para a parte errada do problema. Recusa
+sumária erraria em três linhas de quatro.
+
+O terceiro veredito é onde aquele estudo se vira contra o próprio ferramental: o módulo de
+roteirização deste repositório é da mesma classe de modelo que produziu o número do fornecedor, e
+está sujeito ao mesmo artefato. **Auditoria que não encontra nada de errado no próprio método não é
+auditoria**, e dizer isso é o que torna os outros três vereditos legíveis.
 
 ### O que um estudo tem de fazer
 
