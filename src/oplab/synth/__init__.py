@@ -12,6 +12,7 @@ from .counts import generate_cycle_counts
 from .dataset import Dataset, generate_dataset
 from .deliveries import generate_deliveries, size_band
 from .demand import generate_demand
+from .events import HAPPY_PATH, VALUE_ADDING, generate_order_events
 from .inbound import generate_receipts
 from .outbound import generate_order_lines
 from .process import SpecialCause, generate_subgroups
@@ -20,7 +21,9 @@ from .warehouse import generate_assignment, generate_layout
 
 __all__ = [
     "DEFAULT_SITES",
+    "HAPPY_PATH",
     "SUPPLIER_PROFILES",
+    "VALUE_ADDING",
     "Dataset",
     "SiteProfile",
     "SpecialCause",
@@ -33,6 +36,7 @@ __all__ = [
     "generate_dataset",
     "generate_demand",
     "generate_layout",
+    "generate_order_events",
     "generate_order_lines",
     "generate_purchase_orders",
     "generate_receipts",

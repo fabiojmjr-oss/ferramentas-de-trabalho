@@ -42,6 +42,7 @@ def test_every_table_is_populated(dataset) -> None:  # type: ignore[no-untyped-d
         "cost_ledger",
         "deliveries",
         "purchase_orders",
+        "order_events",
     }
 
 

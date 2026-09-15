@@ -9,6 +9,9 @@ The synthetic generator is part of the product, not a shortcut: it makes every e
 reproducible (`seed=42` yields the same numbers on any machine) and keeps the repository free
 of confidentiality and data-protection constraints.
 
+The site, carrier and supplier names that appear in the tables and in the documentation are
+invented labels, not abbreviations of real organisations.
+
 **PT —** Todos os conjuntos de dados deste repositório são gerados pelo módulo `oplab.synth`
 a partir de um processo pseudoaleatório com semente fixa. Nenhum dado, estrutura, parâmetro ou
 valor de indicador tem origem em empregador, cliente ou terceiro. Nada aqui reproduz
@@ -18,3 +21,6 @@ operação real.
 O gerador sintético é parte do produto, não um atalho: torna todo exemplo reprodutível
 (`seed=42` produz os mesmos números em qualquer máquina) e mantém o repositório livre de
 restrições de sigilo e de proteção de dados.
+
+Os nomes de unidades, transportadoras e fornecedores que aparecem nas tabelas e na documentação
+são rótulos inventados, não abreviações de organizações reais.

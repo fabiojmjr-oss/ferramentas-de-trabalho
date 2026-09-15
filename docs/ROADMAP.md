@@ -19,7 +19,7 @@ decision-neutral is left out.
 | 5 | DC capacity simulation | `oplab.simulation` | Where is the constraint, and what does relieving it buy? | 3 — done |
 | 6 | Route optimiser | `oplab.routing` | What does a delivery cost under each fleet scenario? | 3 — done |
 | 7 | Multi-site benchmark | `oplab.benchmark` | Which site is genuinely underperforming once size and mix are held constant? | 4 — done |
-| 8 | Process mining | `oplab.mining` | What does the process actually do, as opposed to the flowchart? | 4 |
+| 8 | Process mining | `oplab.mining` | What does the process actually do, as opposed to the flowchart? | 4 — done |
 | 9 | Forecast baseline | `oplab.forecast` | Does this forecast beat seasonal naive, measured honestly? | 4 — done |
 | 10 | Inventory policy lab | `oplab.inventory` | What does each point of service level cost in working capital? | 4 — done |
 
@@ -112,8 +112,7 @@ not the 8.8% the under-searched solve reported, because a heuristic given too li
 struggles more with the constrained problem than with the open one and therefore overstates the
 cost of every constraint priced with it.
 
-Wave 3 is closed. Wave 4 is in progress: the multi-site benchmark, the forecast baseline and
-the inventory policy lab are done; process mining is the last item.
+Wave 3 is closed. Wave 4 is closed: the generator and all ten tools are built.
 
 ## Wave 4 — differentiation
 
@@ -141,9 +140,39 @@ compares each unit against a benchmark it is part of, and on four sites that is 
 reference: a site 20% worse than its peers scores 1.02 rather than 1.20 because its own cost
 drags the standard towards it.
 
-**Process mining.** From an event log to a discovered process map, cycle time per transition,
-rework loops, and lead time against value-added time. A value stream map generated from data
-rather than from sticky notes.
+**Process mining** *(complete — [module README](../src/oplab/mining/README.md))*. From an event log
+to a discovered process map, cycle time per transition, rework loops, and lead time against
+value-added time — a value stream map generated from data rather than from sticky notes.
+
+It needed a second new generator table, for a reason worth recording. A discovered map is only
+worth drawing if the log contains paths nobody documented, and none of the existing tables has any:
+`order_lines` and `receipts` are milestone columns in a fixed order, so every case follows the same
+sequence and the discovered map is a picture of the flowchart. `generate_order_events` produces the
+branches instead — credit holds, shortages that return to allocation, quality checks that fail and
+loop, address corrections, failed deliveries — with explicit probabilities, so the discovery can be
+checked against what was generated. It also records a start *and* a completion per event, because
+without both, work cannot be separated from wait and flow efficiency is not computable. Like the
+purchase orders, it is appended at the end of the generator and changed no figure above it.
+
+Four results, one of them about a metric rather than about the process:
+
+- **Flow efficiency is 3.10% where the usually quoted busy share is 6.53%.** The gap is 1.48 hours
+  of credit checks, quality checks and repacks: 53% of all working time exists only because
+  something went wrong earlier.
+- **The step with the longest touch time holds 6.4% of the waiting; a three-minute step holds
+  35.7%**, because it runs 3,911 times rather than 426. A workshop ranks by how slow a step feels
+  and the log ranks by hours contributed.
+- **35 paths and 4 routes are different facts.** The documented path covers 61.1% of cases, and four
+  paths cover 80% of the volume, so the process is standardisable and the tail is exceptions — a
+  distinction a variant count on its own cannot make.
+- **A containment conformance score reads 97.8% on a process 61.1% of cases follow**, and
+  `1 − 89/4000` is exactly that figure, where 89 is the cancellations. The measure permits inserted
+  steps, so it is blind to 1,467 cases that finished by an undocumented route. That is a statement
+  about the measure this module uses, and it is in the module docstring rather than a footnote.
+
+The deviating cases take 2.0 times the lead time of conforming ones *and* have worse flow
+efficiency, which is the business case: a variant count says the process is not standard and invites
+an argument about whether that matters; this says what the non-standard cases cost.
 
 **Forecast baseline** *(complete — [module README](../src/oplab/forecast/README.md))*.
 Rolling-origin backtesting against naive, seasonal naive, moving average, drift, Croston, SBA and

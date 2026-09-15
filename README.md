@@ -39,9 +39,9 @@ one silently.
 | `oplab.benchmark` | Which site is underperforming once size and geography are held constant? | [README](src/oplab/benchmark/README.md) |
 | `oplab.forecast` | Does the forecast beat doing nothing, and how would you know? | [README](src/oplab/forecast/README.md) |
 | `oplab.inventory` | What does a point of service level cost, and which lever buys it? | [README](src/oplab/inventory/README.md) |
+| `oplab.mining` | What does the process do, as opposed to what the flowchart says? | [README](src/oplab/mining/README.md) |
 
-One more tool is planned. Build sequence and selection rule in
-[`docs/ROADMAP.md`](docs/ROADMAP.md).
+Build sequence and selection rule in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Install
 
@@ -64,7 +64,7 @@ print(service_sensitivity(dataset.order_lines))  # one order book, four conventi
 
 ---
 
-## Ten things it demonstrates
+## Eleven things it demonstrates
 
 ### 1. A sixteen-point service spread with no change to the operation
 
@@ -358,6 +358,47 @@ Details in the [module README](src/oplab/inventory/README.md).
 
 ---
 
+### 11. A conformance score of 97.8% on a process that 61% of cases follow
+
+A value stream map drawn in a workshop is a set of estimates with a consensus attached. Derived
+from a 38,735-event fulfilment log instead, it disagrees in four ways.
+
+**Flow efficiency is 3.10%, and the number usually quoted is 6.53%.** Of 43.21 hours of mean lead
+time, 40.39 are waiting and 2.82 are working — but only 1.34 of those working hours advance the
+order. **53% of all working time is credit checks, quality checks and repacks**: work by any measure
+of activity, waste by any measure of value. Counting it as value flatters the headline without
+anybody lying, which is why the value-adding set is a required argument here with no default.
+
+**The step with the longest touch time is not the step that holds the lead time.** Credit Hold takes
+6.34 hours and holds 6.4% of all waiting. Ship takes three minutes and holds 35.7%, because it runs
+3,911 times rather than 426. A workshop is right about which step feels slow and wrong about which
+one costs; four handovers hold three quarters of the waiting, and nothing outside them is worth a
+project.
+
+**35 paths and 4 routes are different facts.** The documented path covers 61.1% of cases, which is
+usually read as chaos — while four paths cover 80% of the volume, which means the process is
+standardisable and the rest is exceptions. A variant count alone cannot tell those two situations
+apart, so `variant_coverage` returns both.
+
+**And the conformance metric is the finding, not the answer.** A containment test scores
+**97.8%** — and `1 − 89/4000` is exactly that, where 89 is the number of cancelled cases. It rejects
+nothing else, because it permits inserted steps, so it is blind to the **1,467 cases that reached
+delivery by a route nobody documented**. A conformance score near one is evidence about the measure,
+not about the process.
+
+What the exceptions cost is the part a sponsor can act on:
+
+| Group | Cases | Mean lead time | Flow efficiency |
+| --- | --- | --- | --- |
+| Follows the documented path | 2,444 | 30.94 h | 4.42% |
+| Deviates | 1,556 | **62.49 h** | **2.07%** |
+
+A deviating case takes twice as long *and* is proportionally worse, not simply longer.
+
+Details in the [module README](src/oplab/mining/README.md).
+
+---
+
 ## Design principles
 
 **Validate at the boundary.** Every public KPI function checks its input against a contract in
@@ -442,8 +483,10 @@ Stated plainly, because the gaps matter as much as the coverage:
   items at all. Its simulation needs a warm-up, and the warm-up is the finding: without one
   the same policy measured between 89.3% and 97.3% cycle service on identical data. See the
   [module README](src/oplab/inventory/README.md).
-- There is no process mining yet. It is the last item of wave 4 of
-  [`docs/ROADMAP.md`](docs/ROADMAP.md).
+- Process mining here discovers a directly-follows graph, which records what followed what and
+  cannot express a choice, a parallel split or a loop boundary; its conformance check is a
+  subsequence test rather than an alignment, and finding 11 is partly a statement about that
+  limit. See the [module README](src/oplab/mining/README.md).
 
 ## Development
 
@@ -454,12 +497,12 @@ make check-all  # the above plus every documented figure re-derived
 make claims     # re-derive every number quoted in a README
 ```
 
-**501 tests, 96% statement coverage, split by cost.** `make check` runs 483 of them in about
-twenty seconds and is what a push is gated on. The remaining 18 re-solve the routing problems,
+**537 tests, 96% statement coverage, split by cost.** `make check` runs 518 of them in about
+thirty seconds and is what a push is gated on. The remaining 19 re-solve the routing problems,
 re-replicate the simulations, re-run the forecast backtests and the inventory policy runs, and
-execute all ten example scripts to verify every figure quoted above; they take under six minutes, and they
-do not depend on the interpreter version, so CI runs the fast gate across Python 3.10 and 3.12 and
-the figure verification once.
+execute all eleven example scripts to verify every figure quoted above; they take TIMING_EN, and
+they do not depend on the interpreter version, so CI runs the fast gate across Python 3.10 and 3.12
+and the figure verification once.
 
 `make check` exists because the alternative failed twice: running the linter but forgetting the
 formatter, and running a locally installed tool older than the one CI installs. Both turned a

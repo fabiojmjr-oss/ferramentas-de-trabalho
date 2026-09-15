@@ -14,6 +14,7 @@ from .costs import generate_cost_ledger
 from .counts import generate_cycle_counts
 from .deliveries import generate_deliveries
 from .demand import generate_demand
+from .events import generate_order_events
 from .inbound import generate_receipts
 from .outbound import generate_order_lines
 from .process import generate_subgroups
@@ -37,6 +38,7 @@ class Dataset:
     deliveries: pd.DataFrame
     cost_ledger: pd.DataFrame
     purchase_orders: pd.DataFrame
+    order_events: pd.DataFrame
 
     @property
     def tables(self) -> dict[str, pd.DataFrame]:
@@ -81,7 +83,7 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
     Returns:
         A :class:`Dataset` holding the catalogue, demand, order lines, receipts, cycle counts,
         process measurements, pick-face layout, current slotting assignment, cost ledger,
-        delivery stops and replenishment orders.
+        delivery stops, replenishment orders and the fulfilment event log.
     """
     cfg = config or SynthConfig()
     rng = np.random.default_rng(cfg.seed)
@@ -103,6 +105,7 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
     # Appended after the ledger for the same reason as the layout: every table above keeps
     # reproducing byte for byte, so no figure published before this step moved.
     purchase_orders = generate_purchase_orders(cfg, catalog, rng)
+    order_events = generate_order_events(cfg, order_lines, rng)
 
     return Dataset(
         config=cfg,
@@ -117,4 +120,5 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
         deliveries=deliveries,
         cost_ledger=cost_ledger,
         purchase_orders=purchase_orders,
+        order_events=order_events,
     )

@@ -987,6 +987,152 @@ def test_the_warmup_finding_reproduces(full: Dataset) -> None:
     assert max(with_warmup) - min(with_warmup) == pytest.approx(0.0118, abs=5e-4)
 
 
+def test_mining_tables(full: Dataset) -> None:
+    """oplab/mining/README.md: four routes carry four fifths of the volume, flow efficiency is
+    3.1%, the slowest step is not the costliest, and a 97.8% conformance score is blind."""
+    from oplab.mining import (
+        activity_times,
+        case_times,
+        conformance,
+        cost_of_deviation,
+        deviations,
+        directly_follows,
+        flow_efficiency,
+        profile_log,
+        rework,
+        to_event_log,
+        variant_coverage,
+        waiting_ranked,
+    )
+    from oplab.synth import HAPPY_PATH, VALUE_ADDING
+
+    log = full.order_events
+
+    # Finding 1: the log supports the analysis, and the wide milestone table does not.
+    profile = profile_log(log)
+    assert profile.cases == 4000
+    assert profile.events == 38735
+    assert profile.activities == 15
+    assert profile.events_per_case == pytest.approx(9.68, abs=5e-3)
+    assert profile.separates_work_from_wait
+
+    milestones = to_event_log(
+        full.order_lines.drop_duplicates("order_id"),
+        "order_id",
+        {"order_ts": "Order Received", "ship_ts": "Ship", "delivered_ts": "Deliver"},
+    )
+    flattened = profile_log(milestones)
+    assert flattened.events == 252883
+    assert not flattened.separates_work_from_wait
+
+    # Finding 2: the variant count and the coverage point opposite ways, and both are reported.
+    needed, total, top = variant_coverage(log, 0.8)
+    assert (needed, total) == (4, 35)
+    assert top == pytest.approx(0.611, abs=5e-4)
+
+    # Finding 3: flow efficiency, and the half of the working time that is not work.
+    efficiency = flow_efficiency(log, VALUE_ADDING)
+    assert efficiency.lead_h == pytest.approx(43.21, abs=5e-3)
+    assert efficiency.work_h == pytest.approx(2.82, abs=5e-3)
+    assert efficiency.wait_h == pytest.approx(40.39, abs=5e-3)
+    assert efficiency.value_adding_h == pytest.approx(1.34, abs=5e-3)
+    assert efficiency.flow_efficiency == pytest.approx(0.0310, abs=5e-5)
+    assert efficiency.busy_share == pytest.approx(0.0653, abs=5e-5)
+    assert efficiency.wait_h / efficiency.lead_h == pytest.approx(0.9347, abs=5e-5)
+    assert 1 - efficiency.value_adding_h / efficiency.work_h == pytest.approx(0.53, abs=5e-3)
+    # The decomposition has to close, or one of the three numbers is measuring something else.
+    assert efficiency.work_h + efficiency.wait_h == pytest.approx(efficiency.lead_h, abs=1e-9)
+
+    # Finding 4: the waiting ranking, and the misdirection it corrects.
+    ranked = waiting_ranked(log).set_index("activity")
+    expected_waiting = {
+        "Ship": (3911, 57715, 0.3572, 0.3572),
+        "Stock Shortage": (553, 23379, 0.1447, 0.5020),
+        "Load": (3911, 22399, 0.1386, 0.6406),
+        "Allocate Stock": (4464, 18347, 0.1136, 0.7542),
+        "Credit Hold": (426, 10313, 0.0638, 0.8180),
+    }
+    for activity, (runs, hours, share, cumulative) in expected_waiting.items():
+        row = ranked.loc[activity]
+        assert row["executions"] == runs
+        assert row["total_wait_after_h"] == pytest.approx(hours, abs=1.0)
+        assert row["share_of_waiting"] == pytest.approx(share, abs=5e-5)
+        assert row["cumulative_share"] == pytest.approx(cumulative, abs=5e-5)
+
+    durations = activity_times(log).set_index("activity")
+    assert durations["mean_duration_h"].idxmax() == "Credit Hold"
+    assert durations.loc["Credit Hold", "mean_duration_h"] == pytest.approx(6.34, abs=5e-3)
+    assert durations.loc["Ship", "mean_duration_h"] == pytest.approx(0.052, abs=5e-4)
+    # The slowest step holds a fourteenth of the waiting the quickest one does.
+    assert (
+        ranked.loc["Ship", "share_of_waiting"] > 5 * ranked.loc["Credit Hold", "share_of_waiting"]
+    )
+
+    # The handovers behind the ranking.
+    graph = directly_follows(log).set_index(["source", "target"])
+    assert graph.loc[("Ship", "Deliver"), "mean_handover_h"] == pytest.approx(14.844, abs=5e-3)
+    assert graph.loc[("Stock Shortage", "Allocate Stock"), "mean_handover_h"] == pytest.approx(
+        42.277, abs=5e-3
+    )
+    assert graph["share"].sum() == pytest.approx(1.0)
+
+    # Finding 5: the fitness is exactly one minus the cancellation rate, and blind to the rest.
+    result = conformance(log, HAPPY_PATH)
+    assert result.cases == 4000
+    assert result.conforming == 3911
+    assert result.exact == 2444
+    assert result.fitness == pytest.approx(0.9778, abs=5e-5)
+    assert result.exact_share == pytest.approx(0.6110, abs=5e-5)
+    cancelled = int((log["activity"] == "Cancel Order").sum())
+    assert cancelled == 89
+    assert result.fitness == pytest.approx(1 - cancelled / result.cases, abs=1e-12)
+    assert result.conforming - result.exact == 1467
+
+    deviation_table = deviations(log, HAPPY_PATH).set_index(["activity", "kind"])
+    expected_deviations = {
+        ("Stock Shortage", "inserted"): (553, 0.1383),
+        ("Allocate Stock", "repeated"): (553, 0.1383),
+        ("Credit Hold", "inserted"): (426, 0.1065),
+        ("Quality Check", "repeated"): (364, 0.0910),
+        ("Repack", "inserted"): (364, 0.0910),
+    }
+    for key, (cases, share) in expected_deviations.items():
+        assert deviation_table.loc[key, "cases"] == cases, key
+        assert deviation_table.loc[key, "share_of_cases"] == pytest.approx(share, abs=5e-5)
+
+    rework_table = rework(log).set_index("activity")
+    assert rework_table.loc["Quality Check", "mean_executions"] == pytest.approx(2.2308, abs=5e-5)
+    assert rework_table.loc["Quality Check", "cases_affected"] == 364
+
+    cost = cost_of_deviation(log, HAPPY_PATH, VALUE_ADDING).set_index("group")
+    clean = cost.loc["follows the documented path"]
+    dirty = cost.loc["deviates"]
+    assert clean["cases"] == 2444
+    assert dirty["cases"] == 1556
+    assert clean["mean_lead_h"] == pytest.approx(30.94, abs=5e-3)
+    assert dirty["mean_lead_h"] == pytest.approx(62.49, abs=5e-3)
+    assert clean["mean_work_h"] == pytest.approx(1.70, abs=5e-3)
+    assert dirty["mean_work_h"] == pytest.approx(4.58, abs=5e-3)
+    assert clean["mean_wait_h"] == pytest.approx(29.24, abs=5e-3)
+    assert dirty["mean_wait_h"] == pytest.approx(57.90, abs=5e-3)
+    assert clean["flow_efficiency"] == pytest.approx(0.0442, abs=5e-5)
+    assert dirty["flow_efficiency"] == pytest.approx(0.0207, abs=5e-5)
+    assert dirty["mean_lead_h"] / clean["mean_lead_h"] == pytest.approx(2.0, abs=5e-2)
+    # The deviating cases are proportionally worse, not just longer - that is the business case.
+    assert dirty["flow_efficiency"] < clean["flow_efficiency"]
+
+    # The deviating group includes the cancellations, which end early and make the figure
+    # conservative. Asserted so the published caveat cannot drift from the data.
+    times = case_times(log).set_index("case_id")
+    cancelled_cases = set(log.loc[log["activity"] == "Cancel Order", "case_id"])
+    traces = log.groupby("case_id", observed=True)["activity"].apply(tuple)
+    deviating = {case for case, trace in traces.items() if trace != tuple(HAPPY_PATH)}
+    assert times.loc[sorted(deviating), "lead_h"].mean() == pytest.approx(62.49, abs=5e-3)
+    assert times.loc[sorted(deviating - cancelled_cases), "lead_h"].mean() == pytest.approx(
+        64.05, abs=5e-3
+    )
+
+
 def test_examples_run_without_error() -> None:
     """The three example scripts are part of the deliverable; a broken one is a broken README."""
     import runpy
@@ -996,7 +1142,7 @@ def test_examples_run_without_error() -> None:
 
     root = Path(__file__).resolve().parents[1]
     scripts = sorted((root / "examples").glob("*.py"))
-    assert len(scripts) == 10
+    assert len(scripts) == 11
 
     for script in scripts:
         captured, sys.stdout = sys.stdout, StringIO()
