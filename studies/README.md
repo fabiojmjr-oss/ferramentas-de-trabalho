@@ -16,6 +16,7 @@ questions produce different work. The studies here are written for the second.
 | [`01_where_to_spend.py`](01_where_to_spend.py) | Four funding candidates, one budget: which are worth the money once each is priced on the same data? |
 | [`02_what_changed.py`](02_what_changed.py) | Three signals on a Monday slide: which are real, which are artefacts of measurement, and is any action justified? |
 | [`03_audit_a_proposal.py`](03_audit_a_proposal.py) | A vendor proposal with four workstreams and 18% on the cover: can any of it be reproduced on this operation's data? |
+| [`04_commit_to_a_promise.py`](04_commit_to_a_promise.py) | A customer wants 99% fill rate with penalties: what is actually being signed, and at what cost? |
 
 The set is deliberate. Study 01 asks *what should I fund?* — a comparison, decided by pricing
 candidates. Study 02 asks *what changed?* — an elimination, decided by establishing which signals
@@ -38,6 +39,27 @@ The third verdict is where that study turns on its own tooling: this repository'
 the same class of model as the one behind the vendor's number, and is subject to the same artefact.
 **An audit that finds nothing wrong with its own method is not an audit**, and saying so is what
 makes the other three verdicts worth reading.
+
+Study 04 is the fourth shape and the only one where the operation **makes** a claim rather than
+examining one. Being wrong there is not an analytical error, it is a penalty payment, and the
+measurements say something uncomfortable: **all four of the largest items on the table are wording
+decisions rather than operational ones.** The same order book delivers 90.03% or 98.26% depending
+on the fill-rate basis named; the same promise costs 82% more in stock depending on which service
+definition it means; and one policy sized for 99% breaches a 99% cycle-service clause while
+clearing a 99% fill-rate clause with half a point to spare.
+
+The recommendation there is to write the definitions down rather than to exploit them, and the
+reason is not decorum. A definitional advantage the counterparty has not understood is a dispute
+with a delay on it, and the asymmetry runs both ways — the customer can find a stricter reading as
+easily as the supplier can find a kinder one.
+
+That study also produced a correction to published work. Pricing the delivery window across four
+search budgets returned a **negative** premium at the cheapest one, which cannot be true of two
+optima, and falsified a prose claim in
+[`oplab.routing`](../src/oplab/routing/README.md) that an under-searched solve *exaggerates* the
+cost of every constraint it prices. The premium is a difference between two errors, and it has no
+reliable sign until both sides are searched properly. It was found with the number already on its
+way to a customer.
 
 ## What a study has to do
 
@@ -80,6 +102,7 @@ perguntas produzem trabalhos diferentes. Os estudos aqui são escritos para a se
 | [`01_where_to_spend.py`](01_where_to_spend.py) | Quatro candidatos a investimento, um orçamento: quais valem o dinheiro, uma vez precificados nos mesmos dados? |
 | [`02_what_changed.py`](02_what_changed.py) | Três sinais num slide de segunda-feira: quais são reais, quais são artefato de medição, e alguma ação se justifica? |
 | [`03_audit_a_proposal.py`](03_audit_a_proposal.py) | Uma proposta de fornecedor com quatro frentes e 18% na capa: alguma parte dela se reproduz nos dados desta operação? |
+| [`04_commit_to_a_promise.py`](04_commit_to_a_promise.py) | Um cliente quer 99% de fill rate com penalidade: o que está sendo assinado de fato, e a que custo? |
 
 O conjunto é deliberado. O estudo 01 pergunta *no que devo investir?* — comparação, decidida
 precificando candidatos. O estudo 02 pergunta *o que mudou?* — eliminação, decidida estabelecendo
@@ -103,6 +126,25 @@ O terceiro veredito é onde aquele estudo se vira contra o próprio ferramental:
 roteirização deste repositório é da mesma classe de modelo que produziu o número do fornecedor, e
 está sujeito ao mesmo artefato. **Auditoria que não encontra nada de errado no próprio método não é
 auditoria**, e dizer isso é o que torna os outros três vereditos legíveis.
+
+O estudo 04 é a quarta forma e a única em que a operação **faz** uma afirmação em vez de examinar
+uma. Errar ali não é erro analítico, é pagamento de multa — e as medições dizem algo incômodo:
+**os quatro maiores itens da mesa são decisões de redação, não de capacidade operacional.** O mesmo
+livro de pedidos entrega 90,03% ou 98,26% conforme a base de fill rate nomeada; a mesma promessa
+custa 82% mais em estoque conforme a definição de serviço que ela significa; e uma política
+dimensionada para 99% descumpre uma cláusula de 99% de serviço de ciclo enquanto cumpre uma de 99%
+de fill rate com meio ponto de margem.
+
+A recomendação ali é escrever as definições, não explorá-las, e a razão não é etiqueta. Vantagem
+definicional que a contraparte não entendeu é disputa com atraso embutido, e a assimetria corre nos
+dois sentidos.
+
+Esse estudo também produziu uma correção em trabalho publicado. Precificar a janela de entrega em
+quatro orçamentos de busca devolveu prêmio **negativo** no mais baixo, o que não pode ser verdade
+para dois ótimos, e falsificou uma afirmação em
+[`oplab.routing`](../src/oplab/routing/README.md) de que um solve com busca insuficiente *exagera*
+o custo de toda restrição que precifica. O prêmio é uma diferença entre dois erros, e não tem sinal
+confiável até que os dois lados sejam pesquisados de verdade.
 
 ### O que um estudo tem de fazer
 

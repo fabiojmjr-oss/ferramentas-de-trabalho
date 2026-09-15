@@ -87,14 +87,34 @@ priced off average distance misprices both.
 
 The commercial promise costs **3.8%, and no extra vehicle**.
 
-That figure is a correction, and the correction is the more useful finding. Under a smaller
-search budget the same comparison came out at nearly three times the premium and one extra van.
-The reason is not noise:
-**an under-searched solve exaggerates the cost of every constraint it prices**, because the
-heuristic struggles more with the constrained problem than with the open one, so the penalty it
-reports is partly its own failure to find the good constrained plan. Anyone pricing what a
-service promise costs by routing with and without it should check that both sides had enough
-budget to be solved properly.
+That figure is a correction, and the correction is the more useful finding. Sweeping the search
+budget on the same comparison:
+
+| Search budget | Premium for the window | Vehicles, enforced vs open |
+| --- | --- | --- |
+| 20 solutions | **−1.70%** | 7 vs 6 |
+| 60 | +2.89% | 7 vs 6 |
+| 120 | +4.66% | 5 vs 5 |
+| 300 | +3.79% | 5 vs 5 |
+
+**At the cheapest budget the premium comes out negative**, which cannot be true: the open problem
+is the constrained one with a restriction removed, so its optimum cannot be higher. A negative
+premium is therefore a proof that at least one of the two solves is far from optimal — and the
+cheap solve reports the window as free while spending an extra van on it, which is implausible
+twice over.
+
+The premium is **a difference between two errors**, not a measurement with a bias. Until both
+sides are searched properly that difference has no reliable sign and no reliable order: it runs
+from −1.70% to +4.66% here, and it is not monotone in the budget. Anyone pricing what a service
+promise costs by routing with and without it has to establish that both sides were solved
+properly before the difference means anything at all.
+
+This corrects an earlier version of this section, which said an under-searched solve *exaggerates*
+the cost of every constraint it prices and put the cheap premium at nearly three times the
+thorough one. Neither survives the sweep above: the direction is not fixed, and the specific
+figure did not reproduce at any budget. It was found while building
+[`studies/04_commit_to_a_promise.py`](../../../studies/04_commit_to_a_promise.py), where the
+number was about to be carried into a negotiation.
 
 What survives the correction is the mechanism. Windows fragment routes in a way capacity does
 not — a van with two thirds of its payload free still has to return to the depot, because it
@@ -246,12 +266,33 @@ parada enquanto um em retração fica mais caro, sem nenhuma tarifa se mover.
 
 A promessa comercial custa **3,8%, e nenhum veículo extra**.
 
-Esse número é uma correção, e a correção é o achado mais útil. Com orçamento de busca menor, a
-mesma comparação dava quase três vezes o prêmio e uma van extra. O motivo não é ruído: **um solve com busca
-insuficiente exagera o custo de toda restrição que ele precifica**, porque a heurística sofre
-mais com o problema restrito que com o aberto, então a penalidade reportada é em parte o próprio
-fracasso dela. Quem precifica o custo de uma promessa de serviço roteirizando com e sem ela
-precisa conferir se os dois lados tiveram orçamento para ser resolvidos de verdade.
+Esse número é uma correção, e a correção é o achado mais útil. Varrendo o orçamento de busca na
+mesma comparação:
+
+| Orçamento de busca | Prêmio da janela | Veículos, com vs sem |
+| --- | --- | --- |
+| 20 soluções | **−1,70%** | 7 vs 6 |
+| 60 | +2,89% | 7 vs 6 |
+| 120 | +4,66% | 5 vs 5 |
+| 300 | +3,79% | 5 vs 5 |
+
+**No orçamento mais baixo o prêmio sai negativo**, o que não pode ser verdade: o problema aberto é
+o restrito com uma restrição removida, então seu ótimo não pode ser maior. Prêmio negativo é,
+portanto, prova de que ao menos um dos dois solves está longe do ótimo — e o solve barato reporta a
+janela como gratuita gastando uma van extra nela, o que é implausível em dobro.
+
+O prêmio é **uma diferença entre dois erros**, não uma medição com viés. Até que os dois lados
+sejam pesquisados de verdade, essa diferença não tem sinal nem ordem confiáveis: vai de −1,70% a
++4,66% aqui, e não é monotônica no orçamento. Quem precifica o custo de uma promessa de serviço
+roteirizando com e sem ela precisa estabelecer que os dois lados foram resolvidos de verdade antes
+que a diferença signifique qualquer coisa.
+
+Isto corrige uma versão anterior desta seção, que dizia que um solve com busca insuficiente
+*exagera* o custo de toda restrição e punha o prêmio barato em quase três vezes o completo. Nenhuma
+das duas afirmações sobrevive à varredura acima: a direção não é fixa, e o número específico não
+reproduziu em nenhum orçamento. Foi encontrado ao construir
+[`studies/04_commit_to_a_promise.py`](../../../studies/04_commit_to_a_promise.py), onde o número
+estava a caminho de uma negociação.
 
 O que sobrevive à correção é o mecanismo: janelas fragmentam rotas de um jeito que capacidade
 não — uma van com dois terços da carga livre ainda tem de voltar ao depósito, porque não alcança
