@@ -481,6 +481,7 @@ que as ferramentas foram construídas.
 | [`03_audit_a_proposal.py`](studies/03_audit_a_proposal.py) | Uma proposta de fornecedor com quatro frentes e 18% na capa: alguma parte dela se reproduz nos dados desta operação? |
 | [`04_commit_to_a_promise.py`](studies/04_commit_to_a_promise.py) | Um cliente quer 99% de fill rate com penalidade: o que está sendo assinado de fato, e a que custo? |
 | [`05_decide_before_you_know.py`](studies/05_decide_before_you_know.py) | Um fornecedor falhou e a janela de expedição fecha ao meio-dia: das quatro análises, qual pode mudar o que fazemos? |
+| [`06_the_decision_you_take_every_week.py`](studies/06_the_decision_you_take_every_week.py) | A mesma revisão de reposição, 52 vezes por ano: o que muda quando a decisão é política e não caso? |
 
 O estudo 01 recusa dois dos quatro por medição, não por orçamento, estreita os dois que aprova, e
 descobre que o maior item não está na lista — 35% da diferença de custo com que o brief abre é
@@ -515,6 +516,17 @@ exatamente nada. O ato de maior valor disponível às 07:00 é um telefonema, qu
 produz. A decisão sai mesmo assim, porque agir em tudo só supera aceitar a perda a 95 dias de falha —
 fora de todo cenário em discussão. **O valor da informação é limitado pelo valor da decisão que ela
 informa**, e esse limite é calculável antes da análise.
+
+O estudo 06 é a outra metade do par do 05, e três coisas se invertem quando a mesma decisão é
+tomada 52 vezes. **O viés acumula enquanto o ruído se cancela**, cruzando em `n* = (sd/viés)²` — daí
+o MAE, que cobra os dois igualmente, elege `seasonal_naive` enquanto a decisão recorrente elege
+`mean`, por 2,4×; numa revisão diária todos os quatro modelos são dominados por viés. **O valor da
+informação escala com as repetições**: a meia-jornada que o estudo 05 corretamente recusou contra
+uma aposta única de BRL 202 se paga aqui em 188 dias e segue pagando. E **re-calibrar toda semana
+inverte o próprio sinal** — um re-ajuste em janela móvel de 90 dias acompanha a demanda já ocorrida
+a +0,9773 e a que precisa cobrir a **−0,3868**, comprando 0,22 ponto de fill rate por 199 unidades
+de giro inútil. O instrumento que diz quando re-calibrar é a carta de controle, que encontra uma
+mudança real de nível contra quarenta re-ajustes de calendário.
 
 Ver [`studies/README.md`](studies/README.md) para o que a forma tem de fazer e o que ela não
 consegue mostrar.
@@ -624,12 +636,12 @@ make check-all  # o acima mais toda figura documentada re-derivada
 make claims     # re-deriva todo número citado em um README
 ```
 
-**566 testes, 96% de cobertura de statements, separados por custo.** 541 deles rodam em cerca de
+**567 testes, 96% de cobertura de statements, separados por custo.** 541 deles rodam em cerca de
 vinte e cinco segundos — menos de um minuto para a sequência inteira do `make check`, com os
-linters, a checagem de tipos e a cobertura — e é o que barra um push. Os 25 restantes re-resolvem
+linters, a checagem de tipos e a cobertura — e é o que barra um push. Os 26 restantes re-resolvem
 os problemas de roteirização, re-replicam as simulações, re-rodam os backtests de previsão e as
-políticas de estoque, e executam os doze exemplos e os cinco estudos para verificar toda figura
-citada acima; levam cerca de onze minutos (10m55s com o estudo 05 incluído, contra 10m18s e 10m19s antes dele), e não
+políticas de estoque, e executam os doze exemplos e os seis estudos para verificar toda figura
+citada acima; levam cerca de onze minutos (11m10s na execução mais recente, contra 10m18s antes de a varredura de orçamento da roteirização ser fixada na onda 8), e não
 dependem da versão do interpretador — então a CI roda o portão rápido em Python 3.10 e 3.12 e a
 verificação de figuras uma vez.
 

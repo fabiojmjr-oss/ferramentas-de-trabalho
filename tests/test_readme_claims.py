@@ -1977,6 +1977,207 @@ def test_study_five_triages_the_clock_it_is_given(full: Dataset) -> None:
     assert exposure(delay=7.0) < blanket
 
 
+def test_study_six_ranks_a_policy_differently_from_a_case(full: Dataset) -> None:
+    """studies/README.md and the root README: when the same decision is taken 52 times, bias
+    overtakes noise, the analysis study 05 refused pays back, and re-tuning inverts its own signal.
+
+    The load-bearing claim is a disagreement between two rankings, so both are pinned - along
+    with the sign of the correlation that makes weekly re-tuning worse than leaving the policy
+    alone, because a sign is the whole finding there.
+    """
+    import numpy as np
+
+    from oplab.forecast import BASELINES, backtest_panel, error_profile, to_panel
+    from oplab.inventory import (
+        ContinuousReview,
+        economic_order_quantity,
+        fit_demand,
+        fit_lead_time,
+        safety_stock,
+        safety_stock_from_forecast_error,
+        simulate_policy,
+        z_for_cycle_service,
+    )
+    from oplab.spc import i_mr_chart
+
+    TRAIL, HOLDING, HALF_DAY = 90, 0.22, 800.0
+
+    panel = to_panel(
+        full.demand.loc[full.demand["site"].astype(str) == "CD-SP"], freq="D", key=("sku",)
+    )
+    panel = panel.loc[:, (panel == 0).mean() <= 0.2]
+    assert panel.shape[1] == 191
+
+    def mean_forecast(history: np.ndarray, horizon: int) -> np.ndarray:
+        return np.full(horizon, float(np.mean(history)) if history.size else 0.0)
+
+    models = {
+        "mean": mean_forecast,
+        "seasonal_naive": BASELINES["seasonal_naive"],
+        "moving_average": BASELINES["moving_average"],
+        "drift": BASELINES["drift"],
+    }
+    results = backtest_panel(panel, models, horizon=7, step=28, min_train=120, season=7)
+
+    # Check 1: bias accumulates as n, noise as sqrt(n), so they cross at n = (sd/bias)^2.
+    stats = {}
+    for name in models:
+        profile = error_profile(results, name)
+        bias = float(profile["bias"].abs().median())
+        spread = float(profile["sd"].median())
+        stats[name] = {
+            "mae": float(profile["mae"].median()),
+            "bias": bias,
+            "sd": spread,
+            "crossover": (spread / bias) ** 2,
+        }
+
+    assert stats["seasonal_naive"]["mae"] == pytest.approx(3.143, abs=5e-4)
+    assert stats["mean"]["mae"] == pytest.approx(3.205, abs=5e-4)
+    assert stats["moving_average"]["mae"] == pytest.approx(3.383, abs=5e-4)
+    assert stats["drift"]["mae"] == pytest.approx(5.929, abs=5e-4)
+    assert stats["mean"]["crossover"] == pytest.approx(177.23, abs=5e-3)
+    assert stats["seasonal_naive"]["crossover"] == pytest.approx(74.16, abs=5e-3)
+    assert stats["moving_average"]["crossover"] == pytest.approx(35.85, abs=5e-3)
+    assert stats["drift"]["crossover"] == pytest.approx(3.348, abs=5e-4)
+
+    # The finding is the disagreement: MAE elects one model, the recurring decision another.
+    by_mae = min(stats, key=lambda name: stats[name]["mae"])
+    by_crossover = max(stats, key=lambda name: stats[name]["crossover"])
+    assert by_mae == "seasonal_naive"
+    assert by_crossover == "mean"
+    assert by_mae != by_crossover
+    assert stats["mean"]["crossover"] / stats["seasonal_naive"]["crossover"] == pytest.approx(
+        2.4, abs=5e-2
+    )
+
+    # At 52 decisions two models are already bias-dominated; at 365 all four are.
+    def dominated(name: str, periods: int) -> bool:
+        return stats[name]["bias"] * periods > stats[name]["sd"] * np.sqrt(periods)
+
+    assert {name for name in stats if dominated(name, 52)} == {"moving_average", "drift"}
+    assert all(dominated(name, 365) for name in stats)
+    # drift survives an MAE shortlist and is the worst policy on the list.
+    assert stats["drift"]["mae"] / stats[by_mae]["mae"] == pytest.approx(1.89, abs=5e-3)
+    assert stats["drift"]["crossover"] < 4
+
+    # Check 2: the same half-day study 05 refused, priced with repetitions.
+    orders = full.purchase_orders
+    supplier_of = orders.drop_duplicates("sku").set_index("sku")["supplier"]
+    lead_times = {
+        name: fit_lead_time(
+            group["lead_days"].to_numpy(), quoted=float(group["quoted_lead_days"].iloc[0])
+        )
+        for name, group in orders.groupby("supplier")
+    }
+    unit_cost = full.catalog.set_index("sku")["unit_cost"]
+    z = z_for_cycle_service(0.95)
+    capital = {}
+    for name in ("mean", "seasonal_naive"):
+        profile = error_profile(results, name).set_index("series")
+        total = 0.0
+        for sku in profile.index:
+            if sku not in supplier_of.index:
+                continue
+            demand = fit_demand(panel[sku].to_numpy())
+            if demand.mean <= 0.0:
+                continue
+            total += safety_stock_from_forecast_error(
+                error_sd=float(profile.loc[sku, "sd"]),
+                error_bias=float(profile.loc[sku, "bias"]),
+                lead_time=lead_times[supplier_of[sku]],
+                z=z,
+                demand_mean=demand.mean,
+            ).units * float(unit_cost[sku])
+        capital[name] = total
+    assert capital["mean"] == pytest.approx(199194, abs=1.0)
+    assert capital["seasonal_naive"] == pytest.approx(206268, abs=1.0)
+    penalty = capital["seasonal_naive"] - capital["mean"]
+    assert penalty == pytest.approx(7074, abs=1.0)
+    annual = penalty * HOLDING
+    assert annual == pytest.approx(1556, abs=1.0)
+    # Study 05 capped the same half-day at a BRL 202 one-off stake and refused it. Here it
+    # pays back inside a year purely because the decision repeats.
+    assert HALF_DAY / annual * 365.0 == pytest.approx(188, abs=1.0)
+    assert annual > 202.0
+
+    # Check 3: re-tuning weekly on a trailing window inverts the signal it is chasing.
+    series = panel[panel.sum().sort_values(ascending=False).index[20]]
+    assert series.name == "SKU-00345"
+    supplier = supplier_of[series.name]
+    lead = lead_times[supplier]
+    cost = float(unit_cost[series.name])
+    values = series.to_numpy()
+    full_profile = fit_demand(values)
+    once = safety_stock(full_profile, lead, z)
+
+    positions, levels = [], []
+    for end in range(TRAIL, len(values) + 1, 7):
+        window = fit_demand(values[end - TRAIL : end])
+        if window.mean <= 0.0:
+            continue
+        positions.append(end - 1)
+        levels.append(safety_stock(window, lead, z).units)
+    level = np.array(levels)
+    assert len(level) == 40
+    assert once.units == pytest.approx(231.69, abs=5e-3)
+    assert level.min() == pytest.approx(177.53, abs=5e-3)
+    assert level.max() == pytest.approx(265.40, abs=5e-3)
+    assert (level.max() - level.min()) / level.mean() == pytest.approx(0.400, abs=5e-4)
+
+    trailing = np.array([values[i - TRAIL + 1 : i + 1].sum() for i in positions])
+    forward = np.array(
+        [
+            values[i + 1 : i + 1 + TRAIL].sum() if i + TRAIL < len(values) else np.nan
+            for i in positions
+        ]
+    )
+    usable = ~np.isnan(forward)
+    corr_trailing = float(np.corrcoef(level, trailing)[0, 1])
+    corr_forward = float(np.corrcoef(level[usable], forward[usable])[0, 1])
+    assert corr_trailing == pytest.approx(0.9773, abs=5e-4)
+    assert corr_forward == pytest.approx(-0.3868, abs=5e-4)
+    # The sign is the finding: a policy moving at random would score zero, so a negative
+    # correlation makes the re-tuning worse than leaving the level alone.
+    assert corr_trailing > 0.9
+    assert corr_forward < 0.0
+
+    quantity = economic_order_quantity(
+        full_profile.mean * 365, order_cost=250.0, unit_cost=cost, holding_rate=HOLDING
+    )
+    achieved = {}
+    for label, units in (("once", once.units), ("low", level.min()), ("high", level.max())):
+        summary = simulate_policy(
+            ContinuousReview(
+                reorder_point=full_profile.mean * lead.mean + units, order_quantity=quantity
+            ),
+            values,
+            lead.sample,
+            periods=1095,
+            replications=40,
+        ).summary()
+        achieved[label] = (float(summary["cycle_service"]), float(summary["fill_rate"]))
+    assert achieved["once"][0] == pytest.approx(0.9559, abs=5e-4)
+    assert achieved["low"][0] == pytest.approx(0.9284, abs=5e-4)
+    assert achieved["high"][0] == pytest.approx(0.9695, abs=5e-4)
+    # The whole 40% swing buys 0.22 points of fill rate, and sizing once sits inside the span.
+    assert (achieved["high"][1] - achieved["low"][1]) * 100 == pytest.approx(0.22, abs=5e-2)
+    assert achieved["low"][0] < achieved["once"][0] < achieved["high"][0]
+    assert np.abs(np.diff(level)).sum() == pytest.approx(199, abs=1.0)
+
+    # Check 4: the chart, not the forecast, is what says a re-tune is justified.
+    individuals, moving_range = i_mr_chart(series.resample("W").sum())
+    violations = individuals.rule_result.violations
+    shifts = int((violations["rule"] == 1).sum())
+    runs = int((violations["rule"] != 1).sum())
+    assert shifts == 1
+    assert runs == 11
+    # A stable spread with an oscillating level is the condition under which a trailing
+    # estimator chases its own tail - which is the mechanism behind the inversion above.
+    assert len(moving_range.rule_result.violations) == 0
+    assert len(level) / shifts == 40.0
+
+
 def test_examples_and_studies_run_without_error() -> None:
     """The runnable scripts are part of the deliverable; a broken one is a broken README."""
     import runpy
@@ -1986,7 +2187,7 @@ def test_examples_and_studies_run_without_error() -> None:
 
     root = Path(__file__).resolve().parents[1]
     scripts = sorted((root / "examples").glob("*.py")) + sorted((root / "studies").glob("*.py"))
-    assert len(scripts) == 17
+    assert len(scripts) == 18
 
     for script in scripts:
         captured, sys.stdout = sys.stdout, StringIO()
