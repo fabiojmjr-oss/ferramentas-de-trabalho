@@ -65,7 +65,7 @@ print(service_sensitivity(dataset.order_lines))  # uma carteira, quatro convenç
 
 ---
 
-## Onze coisas que isso demonstra
+## Doze coisas que isso demonstra
 
 ### 1. Dezesseis pontos de nível de serviço sem mexer na operação
 
@@ -399,6 +399,93 @@ Detalhes no [README do módulo](src/oplab/mining/README.md).
 
 ---
 
+### 12. A métrica que ranqueia a previsão não é a que dimensiona o estoque
+
+Os achados 9 e 10 se sustentam sozinhos e foram construídos separados. Conectá-los expõe que nenhum
+dos dois responde à pergunta que a reposição de fato faz. O `oplab.forecast` ranqueia previsões por
+MASE; o `oplab.inventory` dimensionava estoque de segurança pela variabilidade da demanda. Ambos são
+defensáveis, e ambos respondem a uma pergunta diferente de *quanto pulmão esta previsão precisa?*
+
+**O MASE é construído sobre erro absoluto, e um pulmão tem de cobrir a cauda.** Medindo das duas
+formas contra uma previsão da média de treino:
+
+| Modelo | MASE | MAE vs média | Desvio do erro vs média |
+| --- | --- | --- | --- |
+| mean | 0,9415 | — | — |
+| sba | 0,9417 | +2,8% | +0,8% |
+| seasonal_naive | 0,9496 | +4,8% | **+24,9%** |
+
+O `seasonal_naive` lê **0,9% atrás do líder no MASE e um quarto pior** na grandeza da qual um pulmão
+é dimensionado — o desvio do erro expõe 5,1 vezes o que o erro absoluto mostra. Ranquear por uma
+métrica e dimensionar estoque por outra são duas decisões sobre duas definições de melhor.
+
+**E uma previsão da média de treino tem o menor desvio de erro entre as sete**, então nestes dados
+nada reduz o pulmão de estoque. A razão mediana entre desvio do erro e desvio da demanda é 1,0019; a
+previsão reduz o pulmão em 47% das séries e o aumenta no resto. Isso reconcilia com o achado 9 em
+vez de contradizê-lo: o MASE mede contra a regra *naive*, onde o SBA ganhava 0,8%, e o estoque mede
+contra a *média*, onde não há nada a ganhar.
+
+Duas consequências.
+
+**Previsão viesada é custo que nenhum fator de segurança cobre**, porque elevar `z` alarga uma janela
+que está no lugar errado. O pior sub-dimensionamento roda a −13,27 unidades/dia e cobra **103,2
+unidades de estoque permanente, 32% sobre um pulmão de 321 unidades.** E o viés médio não serve para
+dimensionar: o do SBA é +0,005 — quase zero — enquanto ele sub-dimensiona **52% das séries.** Estoque
+é mantido por item, então média centrada não é previsão centrada.
+
+**Uma tabela de erro por horizonte pode ser uma tabela de sazonalidade com rótulo errado.** O erro do
+passo 4 tem média +8,08 e varia só 1,03 entre nove origens, contra amplitude sistemática de −3,88 a
++8,08 entre passos — o padrão se reproduz em toda origem, então é geometria do backtest, não ruído.
+Origens a 28 períodos com sazonalidade 7 travam todo passo num dia da semana. O `horizon_profile`
+agora devolve um sinalizador `phase_locked`. A regra da raiz quadrada também não se aplica aqui:
+`sqrt(h)` descreve total acumulado, e a coluna medida vai de 0,77 a 1,35 enquanto `sqrt(passo)` vai
+de 1,00 a 2,65.
+
+Detalhes em [`oplab.forecast`](src/oplab/forecast/README.md) e
+[`oplab.inventory`](src/oplab/inventory/README.md).
+
+---
+
+## Exemplos
+
+Doze scripts executáveis, cada um autocontido e cada um imprimindo o raciocínio por trás dos seus
+números, não apenas os números. Todos são executados pela suíte de testes.
+
+| Script | A pergunta que ele percorre |
+| --- | --- |
+| [`01_service_definition.py`](examples/01_service_definition.py) | Quanto de um número de serviço é definição, não desempenho |
+| [`02_process_control.py`](examples/02_process_control.py) | Carte o processo antes de julgá-lo capaz |
+| [`03_network_diagnostic.py`](examples/03_network_diagnostic.py) | Um diagnóstico de uma página de uma rede de quatro unidades |
+| [`04_slotting.py`](examples/04_slotting.py) | Quanto o endereçamento atual custa, e quanto é recuperável |
+| [`05_cost_variance.py`](examples/05_cost_variance.py) | Por que o custo por pedido mudou, e quem responde por cada parte |
+| [`06_capacity_simulation.py`](examples/06_capacity_simulation.py) | Onde está a restrição, e o que aliviá-la compra |
+| [`07_routing.py`](examples/07_routing.py) | Quanto custa uma entrega, e quais decisões o modelo fecha |
+| [`08_multi_site_benchmark.py`](examples/08_multi_site_benchmark.py) | Qual unidade está abaixo, neutralizados porte e geografia |
+| [`09_forecast_baseline.py`](examples/09_forecast_baseline.py) | Se a previsão supera não fazer nada, e como você saberia |
+| [`10_inventory_policy.py`](examples/10_inventory_policy.py) | Quanto custa um ponto de nível de serviço, e qual lever o compra |
+| [`11_process_mining.py`](examples/11_process_mining.py) | O que o processo faz, contra o que o fluxograma diz |
+| [`12_forecast_error_to_stock.py`](examples/12_forecast_error_to_stock.py) | Se prever reduz o estoque que você tem de manter |
+
+---
+
+## Estudos
+
+O `examples/` tem um script por módulo. Um **estudo** toma uma decisão e usa os módulos que
+conseguem precificar as partes dela, na ordem em que a decisão tem de ser tomada — não na ordem em
+que as ferramentas foram construídas.
+
+| Estudo | A decisão que ele toma |
+| --- | --- |
+| [`01_where_to_spend.py`](studies/01_where_to_spend.py) | Quatro candidatos a investimento, um orçamento: quais valem o dinheiro, uma vez precificados nos mesmos dados? |
+
+O estudo 01 recusa dois dos quatro por medição, não por orçamento, estreita os dois que aprova, e
+descobre que o maior item não está na lista — 35% da diferença de custo com que o brief abre é
+geografia, e o próprio número de serviço se move 15,6 pontos só por convenção. Nenhum dos dois se
+resolve gastando dinheiro. Ver [`studies/README.md`](studies/README.md) para o que a forma tem de
+fazer e o que ela não consegue mostrar.
+
+---
+
 ## Princípios de projeto
 
 **Validar na fronteira.** Toda função pública de KPI confere a entrada contra um contrato em
@@ -502,11 +589,11 @@ make check-all  # o acima mais toda figura documentada re-derivada
 make claims     # re-deriva todo número citado em um README
 ```
 
-**537 testes, 96% de cobertura de statements, separados por custo.** O `make check` roda 518
-deles em cerca de trinta segundos e é o que barra um push. Os 19 restantes re-resolvem os problemas
-de roteirização, re-replicam as simulações, re-rodam os backtests de previsão e as políticas de
-estoque, e executam os onze scripts de exemplo para verificar toda figura citada acima; levam
-cerca de seis minutos, e não dependem da versão do interpretador — então a CI roda o portão rápido
+**562 testes, 96% de cobertura de statements, separados por custo.** O `make check` roda 541
+deles em cerca de vinte e cinco segundos e é o que barra um push. Os 21 restantes re-resolvem os
+problemas de roteirização, re-replicam as simulações, re-rodam os backtests de previsão e as
+políticas de estoque, e executam os doze scripts de exemplo para verificar toda figura citada
+acima; levam de cinco a seis minutos, e não dependem da versão do interpretador — então a CI roda o portão rápido
 em Python 3.10 e 3.12 e a verificação de figuras uma vez.
 
 O `make check` existe porque a alternativa falhou duas vezes: rodar o linter e esquecer o

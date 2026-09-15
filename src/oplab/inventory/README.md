@@ -147,6 +147,36 @@ And it is not a trade. Simulated on resampled demand and the capped lead times, 
 policy holds 23.7% less safety stock and still measures **0.9886** cycle service against the 99%
 promise. Reliability is the cheaper input, and it is bought upstream rather than held.
 
+## Finding 7: demand variability is the wrong input when a forecast drives replenishment
+
+The safety-stock formula above buffers against the standard deviation of **demand**. That is the
+right quantity only when the replenishment target is the long-run mean. When it is a **forecast**,
+the quantity to buffer is the standard deviation of the **forecast error** — and the two are not
+interchangeable in a known direction:
+
+| Basis | Safety units | σ | Change |
+| --- | --- | --- | --- |
+| Demand variability | 231.69 | 140.86 | — |
+| Forecast error | 225.45 | 137.00 | **−2.7%** |
+
+On this item the forecast is marginally sharper than the demand spread, so the buffer falls by 2.7%.
+Across the assortment the median ratio of forecast-error spread to demand spread is **1.0019** and
+the forecast reduces the buffer on **47%** of series — so sizing on demand variability is neither
+conservative nor wrong here, it is simply arbitrary. Which direction it errs in is a measurement
+nobody takes, and `compare_sizing_bases` takes it.
+
+**A biased forecast is a separate cost that no safety factor covers.** Raising `z` widens a window
+that is in the wrong place. The worst under-forecast in the assortment runs at −13.27 units a day,
+which charges **103.2 units of permanent stock — 32% on top of a 321-unit buffer** — held purely to
+compensate a forecast that is wrong in one direction. The remedy is to fix the forecast; the charge
+is what it costs until someone does.
+
+And the average bias is the one statistic that cannot size it. Croston's mean bias is +0.47 units a
+day while it under-forecasts 28% of series by −0.67; SBA's mean bias is +0.005, near zero, and it
+under-forecasts **52%** of series. Inventory is held per item, so a centred average is not a
+centred forecast. This is the additivity from [`oplab.forecast`](../forecast/README.md) arriving as
+a cost rather than as an observation.
+
 ## Usage
 
 ```python
@@ -182,6 +212,11 @@ Full walkthrough: [`examples/10_inventory_policy.py`](../../../examples/10_inven
 - **One SKU, one location, one supplier.** There is no multi-echelon allocation, no transshipment,
   no substitution between items, and no shared capacity. Each of those makes the network position
   smaller than the sum of the single-item positions, so the totals here are an upper bound.
+- **The forecast-error sizing inherits the backtest's window.** `error_sd` and `error_bias` come
+  from a rolling-origin backtest, so they describe the forecast's behaviour over that window and
+  assume it carries forward. A forecast whose error changes regime — a new supplier, a range
+  change, a promotion calendar that shifts — invalidates the sizing in a way this module cannot
+  detect.
 - **The formula assumes normality twice over** — demand over the protection interval and the lead
   time itself. The first is defensible on a fast mover by the central limit theorem and
   indefensible on an intermittent one. This module does not size intermittent items; on the sparse
@@ -324,6 +359,35 @@ E não é troca. Simulada com demanda reamostrada e os lead times cortados, a po
 23,7% menos estoque de segurança e ainda mede **0,9886** de serviço de ciclo contra a promessa de
 99%. Confiabilidade é o insumo mais barato, e se compra a montante em vez de se manter em estoque.
 
+### Achado 7: variabilidade da demanda é o insumo errado quando uma previsão comanda a reposição
+
+A fórmula acima amortece o desvio padrão da **demanda**. Essa é a grandeza correta apenas quando o
+alvo de reposição é a média de longo prazo. Quando é uma **previsão**, a grandeza a amortecer é o
+desvio padrão do **erro da previsão** — e as duas não são intercambiáveis numa direção conhecida:
+
+| Base | Segurança (un) | σ | Variação |
+| --- | --- | --- | --- |
+| Variabilidade da demanda | 231,69 | 140,86 | — |
+| Erro da previsão | 225,45 | 137,00 | **−2,7%** |
+
+Neste item a previsão é marginalmente mais apertada que o desvio da demanda, então o pulmão cai
+2,7%. No sortimento, a razão mediana entre desvio do erro e desvio da demanda é **1,0019** e a
+previsão reduz o pulmão em **47%** das séries — então dimensionar pela variabilidade da demanda não
+é conservador nem errado aqui, é simplesmente arbitrário. Para que lado ele erra é uma medição que
+ninguém faz, e o `compare_sizing_bases` faz.
+
+**Previsão viesada é custo separado que nenhum fator de segurança cobre.** Elevar `z` alarga uma
+janela que está no lugar errado. O pior sub-dimensionamento do sortimento roda a −13,27 unidades/dia,
+o que cobra **103,2 unidades de estoque permanente — 32% sobre um pulmão de 321 unidades** — mantidas
+só para compensar uma previsão errada numa direção. O remédio é corrigir a previsão; a cobrança é o
+que ela custa até alguém corrigir.
+
+E o viés médio é a única estatística que não serve para dimensionar. O viés médio do Croston é +0,47
+unidade/dia enquanto ele sub-dimensiona 28% das séries em −0,67; o do SBA é +0,005, quase zero, e ele
+sub-dimensiona **52%** das séries. Estoque é mantido por item, então média centrada não é previsão
+centrada. É a aditividade de [`oplab.forecast`](../forecast/README.md) chegando como custo em vez de
+observação.
+
 ### Premissas e limitações
 
 - **A demanda não atendida é perdida, não pedido em carteira.** Correto para CD de varejo ou
@@ -340,6 +404,10 @@ E não é troca. Simulada com demanda reamostrada e os lead times cortados, a po
 - **Um SKU, um local, um fornecedor.** Não há alocação multi-eco, transferência entre unidades,
   substituição entre itens nem capacidade compartilhada. Cada um deles torna a posição da rede
   menor que a soma das posições individuais, então os totais aqui são limite superior.
+- **O dimensionamento pelo erro de previsão herda a janela do backtest.** `error_sd` e `error_bias`
+  vêm de um backtest de origem móvel, então descrevem o comportamento da previsão naquela janela e
+  presumem que ele se mantém. Previsão cujo erro muda de regime invalida o dimensionamento de um
+  jeito que este módulo não detecta.
 - **A fórmula assume normalidade duas vezes** — demanda no intervalo de proteção e o próprio lead
   time. A primeira é defensável num item de alto giro pelo teorema central do limite e
   indefensável num intermitente. Este módulo não dimensiona itens intermitentes; na metade esparsa

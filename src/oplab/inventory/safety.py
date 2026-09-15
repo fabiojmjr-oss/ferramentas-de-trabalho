@@ -12,6 +12,17 @@ the other is not a rounding difference - it systematically misprices the invento
 contractual service commitment, and the direction of the error depends on the order quantity,
 which is why it cannot be corrected with a fudge factor.
 
+The third confusion is the one this module was initially wrong about, and it is the subtlest.
+The formula below buffers against ``sd_d``, the standard deviation of **demand**. That is the
+right quantity only when the replenishment target is the long-run mean. When it is a **forecast**,
+the quantity to buffer is the standard deviation of the **forecast error**, and the two are not
+interchangeable: a forecast that tracks the series reduces the buffer below demand variability,
+and a forecast that does not adds uncertainty to the decision and enlarges it. Sizing on demand
+variability is therefore not the conservative choice - it is a choice that can be wrong in either
+direction, and which direction depends on a measurement nobody takes.
+:func:`safety_stock_from_forecast_error` takes it, and :func:`compare_sizing_bases` puts the two
+side by side.
+
 The second point this module is built around is the decomposition. The combined formula
 
     ss = z * sqrt((L + R) * sd_d^2 + mu_d^2 * sd_L^2)
@@ -272,3 +283,119 @@ def economic_order_quantity(
     if min(annual_demand, order_cost, unit_cost, holding_rate) <= 0.0:
         raise ValueError("every argument must be positive")
     return (2.0 * annual_demand * order_cost / (unit_cost * holding_rate)) ** 0.5
+
+
+def safety_stock_from_forecast_error(
+    error_sd: float,
+    error_bias: float,
+    lead_time: LeadTimeProfile,
+    z: float,
+    demand_mean: float,
+    review_period: float = 0.0,
+    correct_bias: bool = True,
+) -> SafetyStock:
+    """Size safety stock on the forecast error rather than on demand variability.
+
+    This is the version that applies when replenishment is driven by a forecast. The demand term
+    becomes the forecast error variance over the protection interval; the lead-time term is
+    unchanged, because lead-time variability multiplies the demand *rate* whether or not that rate
+    came from a forecast.
+
+    Args:
+        error_sd: Standard deviation of the forecast error per period, from
+            :func:`~oplab.forecast.error_profile`.
+        error_bias: Mean forecast error per period, forecast minus actual. A positive value is an
+            over-forecast, which inflates stock on its own and needs no buffer; a negative value
+            is an under-forecast, whose shortfall accumulates over the protection interval and is
+            not covered by any amount of symmetric buffer.
+        lead_time: Realised replenishment lead time.
+        z: Safety factor.
+        demand_mean: Mean demand per period, for the lead-time variance term.
+        review_period: Periods between review opportunities.
+        correct_bias: Add the accumulated under-forecast over the protection interval to the
+            buffer. Defaults to true because leaving it out is the common error: a biased forecast
+            produces a policy that misses its service target every cycle in the same direction,
+            and no increase in ``z`` fixes a centre that is in the wrong place. The honest remedy
+            is to fix the forecast; this is what it costs until someone does.
+
+    Returns:
+        A :class:`SafetyStock` whose ``demand_variance`` term is the forecast error variance.
+
+    Raises:
+        ValueError: If ``error_sd`` is negative or ``review_period`` is negative.
+    """
+    if error_sd < 0.0:
+        raise ValueError("error_sd must not be negative")
+    if review_period < 0.0:
+        raise ValueError("review_period must not be negative")
+
+    protection = lead_time.mean + review_period
+    error_term = protection * error_sd**2
+    lead_term = (demand_mean * lead_time.sd) ** 2
+    sigma = (error_term + lead_term) ** 0.5
+
+    units = z * sigma
+    if correct_bias and error_bias < 0.0:
+        units += -error_bias * protection
+
+    return SafetyStock(
+        units=units,
+        z=z,
+        sigma=sigma,
+        demand_variance=error_term,
+        lead_time_variance=lead_term,
+        protection_periods=protection,
+    )
+
+
+def compare_sizing_bases(
+    demand: DemandProfile,
+    lead_time: LeadTimeProfile,
+    error_sd: float,
+    error_bias: float,
+    z: float,
+    review_period: float = 0.0,
+) -> pd.DataFrame:
+    """Put the demand-variability and forecast-error sizings side by side.
+
+    Args:
+        demand: Demand per period.
+        lead_time: Realised replenishment lead time.
+        error_sd: Standard deviation of the forecast error per period.
+        error_bias: Mean forecast error per period, forecast minus actual.
+        z: Safety factor.
+        review_period: Periods between review opportunities.
+
+    Returns:
+        Three rows - sized on demand variability, sized on forecast error, and sized on forecast
+        error without the bias correction - with the safety stock in units and the change against
+        the demand-variability figure. The third row exists to separate the two effects: how much
+        of the difference is the forecast being sharper than the mean, and how much is the price
+        of its bias.
+    """
+    on_demand = safety_stock(demand, lead_time, z, "combined", review_period)
+    on_error = safety_stock_from_forecast_error(
+        error_sd, error_bias, lead_time, z, demand.mean, review_period
+    )
+    no_correction = safety_stock_from_forecast_error(
+        error_sd, error_bias, lead_time, z, demand.mean, review_period, correct_bias=False
+    )
+
+    rows = []
+    for label, sized in (
+        ("demand variability", on_demand),
+        ("forecast error", on_error),
+        ("forecast error, bias uncorrected", no_correction),
+    ):
+        rows.append(
+            {
+                "basis": label,
+                "safety_units": sized.units,
+                "sigma": sized.sigma,
+                "lead_time_variance_share": sized.lead_time_share,
+                "change_vs_demand": sized.units / on_demand.units - 1.0
+                if on_demand.units > 0
+                else float("nan"),
+            }
+        )
+    return pd.DataFrame(rows)

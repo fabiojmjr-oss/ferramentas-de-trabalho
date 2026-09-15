@@ -124,6 +124,62 @@ total is −58.6667. Identical to the last digit, because bias is additive and e
 bias too small to argue about on one item is the same bias, undiminished, on the warehouse — and
 it compounds into inventory in one direction for as long as it runs.
 
+## Finding 5: the metric that ranks a forecast is not the metric that sizes its stock
+
+MASE is built on absolute error. A buffer is not: it has to cover the tail, so a fat-tailed
+forecast costs stock out of proportion to its MAE. Scoring the same backtest both ways, against a
+forecast of the training mean:
+
+| Model | MASE | Median MAE | Median error sd | MAE vs mean | Error sd vs mean |
+| --- | --- | --- | --- | --- | --- |
+| mean | 0.9415 | 2.6419 | **3.2762** | — | — |
+| sba | 0.9417 | 2.7147 | 3.3007 | +2.8% | +0.8% |
+| tsb | 0.9455 | 2.7116 | 3.2945 | +2.6% | +0.6% |
+| croston | 0.9483 | 2.7417 | 3.3046 | +3.8% | +0.9% |
+| seasonal_naive | 0.9496 | 2.7698 | 4.0904 | **+4.8%** | **+24.9%** |
+| naive | 1.6015 | 4.6508 | 5.6971 | +76.0% | +73.9% |
+
+**`seasonal_naive` reads 0.9% behind the leader on MASE and a quarter worse on the quantity a
+buffer is sized from** — the error spread exposes 5.1 times what the absolute error shows. Ranking
+on MASE and then sizing stock is two decisions taken on two different definitions of better.
+
+The second result in that table is blunter. **A forecast of the training mean has the lowest error
+spread of the seven, so nothing here reduces the inventory buffer.** The median ratio of
+forecast-error spread to demand spread is 1.0019, and the forecast reduces the buffer on 47% of
+series and enlarges it on the rest. That is not a defect of the methods; it is the measurement that
+says what forecasting is worth on this data, and it belongs in a business case rather than after
+one. `error_profile` reports the ratio per series for exactly that reason.
+
+## Finding 6: a per-horizon error table can be a seasonality table wearing a horizon label
+
+| Step | Bias | Error sd | sd vs step 1 | `sqrt(step)` | `phase_locked` |
+| --- | --- | --- | --- | --- | --- |
+| 1 | −2.65 | 10.42 | 1.00 | 1.00 | true |
+| 2 | −0.86 | 8.04 | 0.77 | 1.41 | true |
+| 3 | +4.25 | 8.98 | 0.86 | 1.73 | true |
+| 4 | **+8.08** | **14.08** | 1.35 | 2.00 | true |
+| 7 | −3.88 | 12.89 | 1.24 | 2.65 | true |
+
+Step 4's error averages +8.08 and varies by only 1.03 across the nine origins, against a systematic
+spread of −3.88 to +8.08 between steps. **The pattern reproduces at every origin, so it is not
+sampling noise** — it is the backtest's own geometry. Origins are 28 periods apart and the season is
+7, so every horizon step lands on the same phase of the week, every time; step 4 is always the same
+weekday, and a flat forecast carries that weekday's deviation as a constant error. The column reads
+as a horizon effect and is a seasonal one. `horizon_profile` takes the step and the season and
+returns a `phase_locked` flag rather than leaving it to be noticed.
+
+**And the square-root rule does not belong in this table at all.** `sqrt(h)` describes the error of
+a *cumulative* total, or of a random walk. The per-period error of a flat forecast on a stationary
+series does not grow — the measured column runs 0.77 to 1.35 while `sqrt(step)` runs 1.00 to 2.65.
+Inventory needs the cumulative quantity, which is why
+[`oplab.inventory`](../inventory/README.md) multiplies the error *variance* by the protection
+interval instead of reading a growth rate off here.
+
+The intervals carry the same asymmetry. A nominal 95% normal interval covers 96.9% at step 3 — too
+wide, not too narrow — and misses 2.9% below against 0.2% above. A symmetric interval on a skewed
+error distribution is wrong twice over: it holds stock it does not need, and it misses on the side
+that causes stockouts.
+
 ## Usage
 
 ```python
@@ -162,9 +218,16 @@ Full walkthrough: [`examples/09_forecast_baseline.py`](../../../examples/09_fore
 - **The segment split is a threshold on zero share, and thresholds are arguable.** 50% empty
   periods is a convention, not a derived cut. The result that the leader changes across the cut
   is robust to moving it; the exact MASE values are not.
-- **No prediction intervals.** Every method here returns a point forecast. Safety stock needs a
-  distribution of forecast error, not a point — that is the neighbouring problem, and it lives in
-  `oplab.inventory`.
+- **The prediction intervals are in-sample.** They are quantiles of the residuals they are then
+  scored against, so `empirical_coverage` sits at its nominal level almost by construction and is
+  not out-of-sample validation. The row that carries information is the normal one, fitted to two
+  moments of the same residuals and still missing asymmetrically. A genuinely held-out interval
+  needs a second split this module does not make.
+- **The error profile is measured on the backtest window, and the demand benchmark with it.**
+  `demand_sd` is the spread of the actuals in that window, so the ratio compares the forecast
+  against the best possible *constant* forecast — one that knew the window's mean in advance. That
+  makes the benchmark slightly generous to the mean strategy, and the finding that nothing beats it
+  correspondingly stronger.
 
 ---
 
@@ -278,6 +341,61 @@ acuracidade de um agregado, e diz quase nada sobre reabastecer um item.
 para discutir num item é o mesmo viés, sem diminuição, no armazém — e acumula em estoque numa
 única direção enquanto durar.
 
+### Achado 5: a métrica que ranqueia a previsão não é a que dimensiona o estoque
+
+O MASE é construído sobre erro absoluto. Um pulmão não é: ele tem de cobrir a cauda, então previsão
+de cauda gorda custa estoque fora de proporção ao seu MAE. Medindo o mesmo backtest das duas
+formas, contra uma previsão da média de treino:
+
+| Modelo | MASE | MAE mediano | Desvio do erro | MAE vs média | Desvio vs média |
+| --- | --- | --- | --- | --- | --- |
+| mean | 0,9415 | 2,6419 | **3,2762** | — | — |
+| sba | 0,9417 | 2,7147 | 3,3007 | +2,8% | +0,8% |
+| tsb | 0,9455 | 2,7116 | 3,2945 | +2,6% | +0,6% |
+| croston | 0,9483 | 2,7417 | 3,3046 | +3,8% | +0,9% |
+| seasonal_naive | 0,9496 | 2,7698 | 4,0904 | **+4,8%** | **+24,9%** |
+| naive | 1,6015 | 4,6508 | 5,6971 | +76,0% | +73,9% |
+
+**O `seasonal_naive` lê 0,9% atrás do líder no MASE e um quarto pior na grandeza da qual um pulmão
+é dimensionado** — o desvio do erro expõe 5,1 vezes o que o erro absoluto mostra. Ranquear por MASE
+e depois dimensionar estoque são duas decisões tomadas sobre duas definições diferentes de melhor.
+
+O segundo resultado da tabela é mais direto. **Uma previsão da média de treino tem o menor desvio de
+erro entre as sete, então nada aqui reduz o pulmão de estoque.** A razão mediana entre o desvio do
+erro de previsão e o desvio da demanda é 1,0019, e a previsão reduz o pulmão em 47% das séries e o
+aumenta no resto. Não é defeito dos métodos; é a medição que diz quanto prever vale nestes dados, e
+pertence ao business case, não a depois dele.
+
+### Achado 6: uma tabela de erro por horizonte pode ser uma tabela de sazonalidade com rótulo errado
+
+| Passo | Viés | Desvio | Desvio vs passo 1 | `sqrt(passo)` | `phase_locked` |
+| --- | --- | --- | --- | --- | --- |
+| 1 | −2,65 | 10,42 | 1,00 | 1,00 | true |
+| 2 | −0,86 | 8,04 | 0,77 | 1,41 | true |
+| 3 | +4,25 | 8,98 | 0,86 | 1,73 | true |
+| 4 | **+8,08** | **14,08** | 1,35 | 2,00 | true |
+| 7 | −3,88 | 12,89 | 1,24 | 2,65 | true |
+
+O erro do passo 4 tem média +8,08 e varia só 1,03 entre as nove origens, contra amplitude
+sistemática de −3,88 a +8,08 entre passos. **O padrão se reproduz em toda origem, então não é ruído
+de amostragem** — é a geometria do próprio backtest. As origens estão a 28 períodos e a
+sazonalidade é 7, então todo passo do horizonte cai na mesma fase da semana, sempre; o passo 4 é
+sempre o mesmo dia da semana, e uma previsão plana carrega o desvio daquele dia como erro constante.
+A coluna lê como efeito de horizonte e é efeito sazonal. O `horizon_profile` recebe o passo e a
+sazonalidade e devolve um sinalizador `phase_locked` em vez de deixar isso para ser notado.
+
+**E a regra da raiz quadrada não pertence a esta tabela.** `sqrt(h)` descreve o erro de um *total
+acumulado*, ou de um passeio aleatório. O erro por período de uma previsão plana sobre série
+estacionária não cresce — a coluna medida vai de 0,77 a 1,35 enquanto `sqrt(passo)` vai de 1,00 a
+2,65. Estoque precisa da grandeza acumulada, e é por isso que
+[`oplab.inventory`](../inventory/README.md) multiplica a *variância* do erro pelo intervalo de
+proteção em vez de ler uma taxa de crescimento daqui.
+
+Os intervalos carregam a mesma assimetria. Um intervalo normal nominal de 95% cobre 96,9% no passo 3
+— largo demais, não estreito demais — e erra 2,9% abaixo contra 0,2% acima. Intervalo simétrico
+sobre distribuição de erro assimétrica erra duas vezes: mantém estoque que não precisa, e erra do
+lado que causa falta.
+
 ### Premissas e limitações
 
 - **São baselines, não biblioteca de modelos.** Não há ETS, ARIMA, gradient boosting nem
@@ -294,6 +412,12 @@ para discutir num item é o mesmo viés, sem diminuição, no armazém — e acu
 - **O corte de segmento é um limiar sobre share de zeros, e limiar é discutível.** 50% é
   convenção, não corte derivado. O resultado de que o líder muda no corte é robusto a movê-lo; os
   valores exatos de MASE não são.
-- **Não há intervalo de previsão.** Todo método aqui devolve previsão pontual. Estoque de
-  segurança precisa da distribuição do erro, não do ponto — esse é o problema vizinho, e mora em
-  `oplab.inventory`.
+- **Os intervalos de previsão são in-sample.** São quantis dos resíduos contra os quais são então
+  medidos, então a `empirical_coverage` fica no nível nominal quase por construção e não é validação
+  fora da amostra. A linha que informa é a normal, ajustada a dois momentos dos mesmos resíduos e
+  ainda assim errando assimetricamente.
+- **O perfil de erro é medido na janela do backtest, e o benchmark de demanda junto.** O
+  `demand_sd` é o desvio dos realizados naquela janela, então a razão compara a previsão contra a
+  melhor previsão *constante* possível — uma que conhecia a média da janela de antemão. Isso torna o
+  benchmark levemente generoso com a estratégia da média, e o achado de que nada a supera
+  correspondentemente mais forte.

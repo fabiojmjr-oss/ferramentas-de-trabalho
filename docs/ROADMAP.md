@@ -112,7 +112,9 @@ not the 8.8% the under-searched solve reported, because a heuristic given too li
 struggles more with the constrained problem than with the open one and therefore overstates the
 cost of every constraint priced with it.
 
-Wave 3 is closed. Wave 4 is closed: the generator and all ten tools are built.
+Wave 3 is closed. Wave 4 is closed: the generator and all ten tools are built. Wave 5 deepens
+rather than adds - the tool list is complete, and what is left is the connections between the
+tools, which is where the mistakes were hiding.
 
 ## Wave 4 — differentiation
 
@@ -236,6 +238,78 @@ contains few replenishment cycles, so the opening assumption is a large share of
 warm-up of two cycles collapses the spread to 1.2 points. It was believable in both directions,
 which is what made it dangerous, so `warmup` defaults to a computed value rather than to zero and
 the range is asserted in the claim tests.
+
+
+## Wave 5 — connections
+
+The tool count stops at ten on purpose. What wave 5 does instead is join modules that were built
+separately and check whether they agree, which turned out to be the most productive thing in the
+project so far: the first connection attempted found an error in work that had already shipped.
+
+**Forecast error to safety stock** *(complete — [`oplab.forecast`](../src/oplab/forecast/README.md),
+[`oplab.inventory`](../src/oplab/inventory/README.md))*.
+
+`oplab.forecast` ranked forecasts on MASE. `oplab.inventory` sized safety stock on the standard
+deviation of demand. Each is defensible alone and **together they are incoherent**: if replenishment
+is driven by a forecast, the quantity to buffer is the error of that forecast, and sizing on demand
+variability silently assumes the forecast is the long-run mean. That was a real defect in shipped
+code, found by asking the two modules the same question rather than by reading either of them.
+
+The fix added `error_profile`, `horizon_profile`, `prediction_interval` and `interval_coverage` to
+`oplab.forecast`, and `safety_stock_from_forecast_error` and `compare_sizing_bases` to
+`oplab.inventory`. Four results came out of it:
+
+- **The metric that ranks a forecast is not the metric that sizes its stock.** `seasonal_naive`
+  reads 0.9% behind the leader on MASE and 24.9% worse on error spread — the quantity a buffer is
+  sized from. MASE is built on absolute error and a buffer has to cover the tail, so the spread
+  exposes 5.1 times what absolute error shows.
+- **A forecast of the training mean has the lowest error spread of the seven**, so on this data
+  nothing reduces the inventory buffer. Median ratio of forecast-error spread to demand spread:
+  1.0019. This reconciles with wave 4 rather than contradicting it — MASE measures against the
+  naive rule, inventory measures against the mean.
+- **A biased forecast is a cost no safety factor covers**, at 103.2 units of permanent stock (32%
+  of the buffer) on the worst under-forecast — and the average bias cannot size it, because SBA's
+  near-zero mean bias coexists with under-forecasting 52% of series.
+- **A per-horizon error table is a seasonality table when origins are a whole number of seasons
+  apart.** Step 4's error averages +8.08 and varies by 1.03 across nine origins: the pattern
+  reproduces every time, so it is geometry rather than noise. `horizon_profile` now returns a
+  `phase_locked` flag. The square-root rule also does not apply to a per-period error, only to a
+  cumulative one — which is why the sizing multiplies error *variance* by the protection interval
+  instead of reading a growth rate off that table.
+
+Two of my own hypotheses about that last finding were wrong before the third was right, and both
+are recorded in the module README rather than tidied away: a `step=25` run failed to disprove the
+phase-lock explanation, and a shared-demand-shock explanation was ruled out by reading the
+generator. What settled it was measuring the mean error per origin and per step and seeing the
+between-origin spread come out an order of magnitude below the between-step spread.
+
+**An integrated study** *(complete — [`studies/README.md`](../studies/README.md))*. A new artefact
+type, and the directory is separate from `examples/` because the form is different. An example has
+one script per module, each answering the question that module was built for. A study takes **one
+decision** and uses whichever modules can price the parts of it, in the order the decision has to be
+taken rather than the order the tools were built.
+
+`studies/01_where_to_spend.py` takes a brief as it arrives — *CD-PE has the worst service and the
+highest cost per order, fix it* — with four funding candidates, each with a sponsor. It checks the
+brief before pricing anything, prices all four on the same data, and reaches verdicts:
+
+- **Re-slot the pick face: fund**, but decline the algorithm study the sponsor asked for. The best
+  rule recovers 70% of the travel at CD-PE and the three rules sit 2.6 points apart.
+- **Buy a forecasting system: decline.** Of eight methods scored the lowest error spread belongs to
+  a forecast of the training mean, which is what the inventory formula already assumes.
+- **Standardise the order process: fund, scoped** to the four handovers holding 75% of the waiting,
+  rather than to 35 process variants.
+- **Hold more safety stock: decline as asked, act on the cause.** The current plan is already 37%
+  short because it sizes on the contract, and capping one supplier's worst 5% of deliveries releases
+  16% of the assortment's buffer while improving service.
+
+The result worth the form: **the largest item is not on the list of candidates.** 35% of the cost
+gap the brief opens with is geography, and the service number moves 15.6 points on convention alone.
+Neither is fixed by spending money, and neither would have been found by pricing the candidates
+first. The study ends by naming the one measurement that would overturn its own conclusion, which is
+the difference between a conclusion and a position.
+
+**Wave 5 is closed.**
 
 ## Cross-cutting
 

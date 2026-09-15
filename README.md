@@ -64,7 +64,7 @@ print(service_sensitivity(dataset.order_lines))  # one order book, four conventi
 
 ---
 
-## Eleven things it demonstrates
+## Twelve things it demonstrates
 
 ### 1. A sixteen-point service spread with no change to the operation
 
@@ -399,6 +399,93 @@ Details in the [module README](src/oplab/mining/README.md).
 
 ---
 
+### 12. The metric that ranks a forecast is not the metric that sizes its stock
+
+Findings 9 and 10 each stand alone and were built separately. Connecting them exposes that neither
+answers the question replenishment actually asks. `oplab.forecast` ranks forecasts on MASE;
+`oplab.inventory` sized safety stock on the variability of demand. Both are defensible, and both
+are answering a different question from *how much buffer does this forecast need?*
+
+**MASE is built on absolute error, and a buffer has to cover the tail.** Scored both ways against a
+forecast of the training mean:
+
+| Model | MASE | MAE vs mean | Error sd vs mean |
+| --- | --- | --- | --- |
+| mean | 0.9415 | — | — |
+| sba | 0.9417 | +2.8% | +0.8% |
+| seasonal_naive | 0.9496 | +4.8% | **+24.9%** |
+
+`seasonal_naive` reads **0.9% behind the leader on MASE and a quarter worse** on the quantity a
+buffer is sized from — the error spread exposes 5.1 times what absolute error shows. Ranking on one
+metric and then sizing stock on another is two decisions taken on two definitions of better.
+
+**And a forecast of the training mean has the lowest error spread of the seven**, so on this data
+nothing reduces the inventory buffer. The median ratio of forecast-error spread to demand spread is
+1.0019; the forecast reduces the buffer on 47% of series and enlarges it on the rest. That reconciles
+with finding 9 rather than contradicting it: MASE measures against the *naive* rule, where SBA won
+by 0.8%, and inventory measures against the *mean*, where there is nothing to win.
+
+Two consequences follow.
+
+**A biased forecast is a cost no safety factor covers**, because raising `z` widens a window that
+is in the wrong place. The worst under-forecast runs at −13.27 units a day and charges **103.2 units
+of permanent stock, 32% on top of a 321-unit buffer.** And the average bias cannot size it: SBA's
+mean bias is +0.005 — near zero — while it under-forecasts **52% of series.** Inventory is held per
+item, so a centred average is not a centred forecast.
+
+**A per-horizon error table can be a seasonality table wearing a horizon label.** Step 4's error
+averages +8.08 and varies by only 1.03 across nine origins, against a systematic spread of −3.88 to
++8.08 between steps — the pattern reproduces at every origin, so it is the backtest's geometry, not
+noise. Origins 28 periods apart with a season of 7 pin every horizon step to one weekday.
+`horizon_profile` now returns a `phase_locked` flag. The square-root rule does not apply here
+either: `sqrt(h)` describes a cumulative total, and the measured column runs 0.77 to 1.35 while
+`sqrt(step)` runs 1.00 to 2.65.
+
+Details in [`oplab.forecast`](src/oplab/forecast/README.md) and
+[`oplab.inventory`](src/oplab/inventory/README.md).
+
+---
+
+## Examples
+
+Twelve runnable scripts, each self-contained and each printing the reasoning behind its figures
+rather than only the figures. Every one of them is executed by the test suite.
+
+| Script | The question it works through |
+| --- | --- |
+| [`01_service_definition.py`](examples/01_service_definition.py) | How much of a service number is definition rather than performance |
+| [`02_process_control.py`](examples/02_process_control.py) | Chart the process before judging it capable |
+| [`03_network_diagnostic.py`](examples/03_network_diagnostic.py) | A one-page diagnostic of a four-site network |
+| [`04_slotting.py`](examples/04_slotting.py) | What the current slotting costs, and how much is recoverable |
+| [`05_cost_variance.py`](examples/05_cost_variance.py) | Why cost per order moved, and who owns each part of it |
+| [`06_capacity_simulation.py`](examples/06_capacity_simulation.py) | Where the constraint is, and what relieving it buys |
+| [`07_routing.py`](examples/07_routing.py) | What a delivery costs, and which decisions the model can settle |
+| [`08_multi_site_benchmark.py`](examples/08_multi_site_benchmark.py) | Which site underperforms once size and geography are held constant |
+| [`09_forecast_baseline.py`](examples/09_forecast_baseline.py) | Whether the forecast beats doing nothing, and how you would know |
+| [`10_inventory_policy.py`](examples/10_inventory_policy.py) | What a point of service level costs, and which lever buys it |
+| [`11_process_mining.py`](examples/11_process_mining.py) | What the process does, against what the flowchart says |
+| [`12_forecast_error_to_stock.py`](examples/12_forecast_error_to_stock.py) | Whether forecasting reduces the stock you have to hold |
+
+---
+
+## Studies
+
+`examples/` has one script per module. A **study** takes one decision and uses whichever modules
+can price the parts of it, in the order the decision has to be taken rather than the order the
+tools were built.
+
+| Study | The decision it takes |
+| --- | --- |
+| [`01_where_to_spend.py`](studies/01_where_to_spend.py) | Four funding candidates, one budget: which are worth the money once each is priced on the same data? |
+
+Study 01 declines two of the four on measurement rather than on budget, narrows the two it funds,
+and finds that the largest item is not on the list — 35% of the cost gap the brief opens with is
+geography, and the service number itself moves 15.6 points on convention alone. Neither is fixed by
+spending money. See [`studies/README.md`](studies/README.md) for what the form has to do and what
+it cannot show.
+
+---
+
 ## Design principles
 
 **Validate at the boundary.** Every public KPI function checks its input against a contract in
@@ -497,10 +584,11 @@ make check-all  # the above plus every documented figure re-derived
 make claims     # re-derive every number quoted in a README
 ```
 
-**537 tests, 96% statement coverage, split by cost.** `make check` runs 518 of them in about
-thirty seconds and is what a push is gated on. The remaining 19 re-solve the routing problems,
+**562 tests, 96% statement coverage, split by cost.** `make check` runs 541 of them in about
+twenty-five seconds and is what a push is gated on. The remaining 21 re-solve the routing problems,
 re-replicate the simulations, re-run the forecast backtests and the inventory policy runs, and
-execute all eleven example scripts to verify every figure quoted above; they take about six minutes.
+execute all twelve example scripts to verify every figure quoted above; they take five to six
+minutes.
 They do not depend on the interpreter version, so CI runs the fast gate across Python 3.10 and 3.12
 and the figure verification once.
 
