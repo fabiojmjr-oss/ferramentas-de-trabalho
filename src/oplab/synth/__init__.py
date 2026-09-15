@@ -15,10 +15,12 @@ from .demand import generate_demand
 from .inbound import generate_receipts
 from .outbound import generate_order_lines
 from .process import SpecialCause, generate_subgroups
+from .procurement import SUPPLIER_PROFILES, generate_purchase_orders
 from .warehouse import generate_assignment, generate_layout
 
 __all__ = [
     "DEFAULT_SITES",
+    "SUPPLIER_PROFILES",
     "Dataset",
     "SiteProfile",
     "SpecialCause",
@@ -32,6 +34,7 @@ __all__ = [
     "generate_demand",
     "generate_layout",
     "generate_order_lines",
+    "generate_purchase_orders",
     "generate_receipts",
     "size_band",
     "generate_subgroups",

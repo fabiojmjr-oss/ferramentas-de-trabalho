@@ -17,12 +17,13 @@ from .demand import generate_demand
 from .inbound import generate_receipts
 from .outbound import generate_order_lines
 from .process import generate_subgroups
+from .procurement import generate_purchase_orders
 from .warehouse import generate_assignment, generate_layout
 
 
 @dataclass(frozen=True)
 class Dataset:
-    """The five tables every example in this repository is built on."""
+    """The tables every example in this repository is built on."""
 
     config: SynthConfig
     catalog: pd.DataFrame
@@ -35,6 +36,7 @@ class Dataset:
     assignment: pd.DataFrame
     deliveries: pd.DataFrame
     cost_ledger: pd.DataFrame
+    purchase_orders: pd.DataFrame
 
     @property
     def tables(self) -> dict[str, pd.DataFrame]:
@@ -78,8 +80,8 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
 
     Returns:
         A :class:`Dataset` holding the catalogue, demand, order lines, receipts, cycle counts,
-        process measurements, pick-face layout, current slotting assignment, cost ledger and
-        delivery stops.
+        process measurements, pick-face layout, current slotting assignment, cost ledger,
+        delivery stops and replenishment orders.
     """
     cfg = config or SynthConfig()
     rng = np.random.default_rng(cfg.seed)
@@ -98,6 +100,9 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
     # table has to exist before the ledger can be derived from it.
     deliveries = generate_deliveries(cfg, order_lines, catalog, rng)
     cost_ledger = generate_cost_ledger(cfg, deliveries, rng)
+    # Appended after the ledger for the same reason as the layout: every table above keeps
+    # reproducing byte for byte, so no figure published before this step moved.
+    purchase_orders = generate_purchase_orders(cfg, catalog, rng)
 
     return Dataset(
         config=cfg,
@@ -111,4 +116,5 @@ def generate_dataset(config: SynthConfig | None = None) -> Dataset:
         assignment=assignment,
         deliveries=deliveries,
         cost_ledger=cost_ledger,
+        purchase_orders=purchase_orders,
     )

@@ -38,8 +38,9 @@ em silêncio.
 | `oplab.routing` | Quanto custa uma entrega, e quais decisões o modelo consegue fechar? | [README](src/oplab/routing/README.md) |
 | `oplab.benchmark` | Qual unidade está abaixo, neutralizados porte e geografia? | [README](src/oplab/benchmark/README.md) |
 | `oplab.forecast` | A previsão supera não fazer nada, e como você saberia? | [README](src/oplab/forecast/README.md) |
+| `oplab.inventory` | Quanto custa um ponto de nível de serviço, e qual lever o compra? | [README](src/oplab/inventory/README.md) |
 
-Mais três ferramentas estão planejadas. Sequência e regra de seleção em
+Mais uma ferramenta está planejada. Sequência e regra de seleção em
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Instalação
@@ -63,7 +64,7 @@ print(service_sensitivity(dataset.order_lines))  # uma carteira, quatro convenç
 
 ---
 
-## Nove coisas que isso demonstra
+## Dez coisas que isso demonstra
 
 ### 1. Dezesseis pontos de nível de serviço sem mexer na operação
 
@@ -311,6 +312,52 @@ Detalhes no [README do módulo](src/oplab/forecast/README.md).
 
 ---
 
+### 10. O nível de serviço do contrato é precificado com um lead time que ninguém mediu
+
+Estoque de segurança é dimensionado contra duas variâncias: demanda por período e lead time de
+reposição. A primeira é estimada dos dados; a segunda quase sempre vem do lead time cotado pelo
+fornecedor, o que zera sua variabilidade. Todo fornecedor aqui entrega perto da **média** cotada —
+por isso o contrato nunca é questionado — e a cotação não diz nada sobre a dispersão:
+
+| Fornecedor | Cotado | Média real | Desvio real | CV |
+| --- | --- | --- | --- | --- |
+| FORN-NACIONAL | 7,0 | 7,77 | 3,56 | **0,46** |
+| FORN-CONTRATO | 12,0 | 12,17 | 1,58 | **0,13** |
+
+Em 191 SKUs regulares a 95% de nível de serviço de ciclo, a exigência é de **BRL 192.305**.
+Dimensionado pelos lead times cotados dá BRL 121.522 — **falta ao plano 58% do estoque que o nível
+de serviço exige**, e a lacuna é invisível porque os dois números saem da mesma fórmula.
+
+Três consequências, cada uma revertendo um instinto comum.
+
+**Qual variância é o lever tem forma fechada.** A variabilidade do lead time domina exatamente
+quando `CV_L² · L > CV_d²`, então há um limiar de CV de demanda por fornecedor — 0,45, 0,45, 0,86 e
+1,28 aqui. O CV de demanda fica perto de 0,76 no sortimento, então lead time é o lever para dois
+fornecedores e demanda é o lever para os outros dois. A pergunta "é lead time ou acuracidade de
+previsão?" não tem resposta geral, e dois números que você já tem a resolvem por fornecedor.
+
+**O lead time menor pode exigir o pulmão maior.** O FORN-CONTRATO leva 57% mais tempo e exige
+**34% menos** estoque de segurança, porque seu lead time é 2,3 vezes mais apertado. A qualificação
+honesta: o estoque total não inverte, porque o estoque em trânsito escala com a média.
+
+**Um compromisso de 99% dimensionado como serviço de ciclo custa 82% mais que o mesmo compromisso
+dimensionado como fill rate** — 328 unidades contra 180. Nenhum está errado; contam coisas
+diferentes, e a conversão exige a quantidade de pedido, razão pela qual não existe fator de
+correção.
+
+O entregável é a curva, e ela precifica a discussão em vez de encerrá-la por autoridade: um ponto
+de serviço de ciclo custa BRL 34,76 na base e BRL 394,28 no topo, onze vezes mais. **O topo da
+curva não compra nada mensurável** — de 99,0% para 99,5% custa 11% mais capital e entrega +0,07% de
+serviço de ciclo simulado, porque o que resta é a cauda assimétrica do lead time.
+
+E o ponto de serviço mais barato não está na curva. Gastar *todo* o ganho de previsão do achado 9
+libera 0,26% do pulmão. Cortar os 5% piores de entregas de um fornecedor libera 23,7% — **fator de
+92** — e a política menor ainda mede 98,9% de serviço de ciclo contra a promessa de 99%.
+
+Detalhes no [README do módulo](src/oplab/inventory/README.md).
+
+---
+
 ## Princípios de projeto
 
 **Validar na fronteira.** Toda função pública de KPI confere a entrada contra um contrato em
@@ -395,7 +442,12 @@ Ditas com clareza, porque as lacunas importam tanto quanto a cobertura:
   regras de uma linha, sem ETS ou ARIMA, sem regressor exógeno e sem intervalo de previsão. Um
   modelo sério pertence ao mesmo harness, comparado na mesma tabela. Ver o
   [README do módulo](src/oplab/forecast/README.md).
-- Ainda não há process mining nem política de estoque. São o restante da onda 4 do
+- O laboratório de estoque é de eco único e um fornecedor por item, reamostra demanda sem
+  autocorrelação, assume venda perdida em vez de carteira, e não dimensiona itens
+  intermitentes. A simulação precisa de warm-up, e o warm-up é o achado: sem ele a mesma
+  política mediu entre 89,3% e 97,3% de serviço de ciclo nos mesmos dados. Ver o
+  [README do módulo](src/oplab/inventory/README.md).
+- Ainda não há process mining. É o último item da onda 4 do
   [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Desenvolvimento
@@ -407,12 +459,12 @@ make check-all  # o acima mais toda figura documentada re-derivada
 make claims     # re-deriva todo número citado em um README
 ```
 
-**429 testes, 95% de cobertura de statements, separados por custo.** O `make check` roda 413
-deles em cerca de dez segundos e é o que barra um push. Os 16 restantes re-resolvem os problemas
-de roteirização, re-replicam as simulações, re-rodam os backtests de previsão e executam os nove
-scripts de exemplo para verificar toda figura citada acima; levam menos de seis minutos, e não dependem da
-versão do interpretador — então a CI roda o portão rápido em Python 3.10 e 3.12 e a verificação de
-figuras uma vez.
+**501 testes, 96% de cobertura de statements, separados por custo.** O `make check` roda 483
+deles em cerca de vinte segundos e é o que barra um push. Os 18 restantes re-resolvem os problemas
+de roteirização, re-replicam as simulações, re-rodam os backtests de previsão e as políticas de
+estoque, e executam os dez scripts de exemplo para verificar toda figura citada acima; levam
+menos de seis minutos, e não dependem da versão do interpretador — então a CI roda o portão rápido em Python
+3.10 e 3.12 e a verificação de figuras uma vez.
 
 O `make check` existe porque a alternativa falhou duas vezes: rodar o linter e esquecer o
 formatador, e rodar uma ferramenta local mais antiga que a instalada pela CI. As duas

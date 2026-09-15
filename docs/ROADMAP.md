@@ -21,7 +21,7 @@ decision-neutral is left out.
 | 7 | Multi-site benchmark | `oplab.benchmark` | Which site is genuinely underperforming once size and mix are held constant? | 4 — done |
 | 8 | Process mining | `oplab.mining` | What does the process actually do, as opposed to the flowchart? | 4 |
 | 9 | Forecast baseline | `oplab.forecast` | Does this forecast beat seasonal naive, measured honestly? | 4 — done |
-| 10 | Inventory policy lab | `oplab.inventory` | What does each point of service level cost in working capital? | 4 |
+| 10 | Inventory policy lab | `oplab.inventory` | What does each point of service level cost in working capital? | 4 — done |
 
 ## Wave 1 — foundation *(complete)*
 
@@ -112,7 +112,8 @@ not the 8.8% the under-searched solve reported, because a heuristic given too li
 struggles more with the constrained problem than with the open one and therefore overstates the
 cost of every constraint priced with it.
 
-Wave 3 is closed. Wave 4 is in progress: the multi-site benchmark is done.
+Wave 3 is closed. Wave 4 is in progress: the multi-site benchmark, the forecast baseline and
+the inventory policy lab are done; process mining is the last item.
 
 ## Wave 4 — differentiation
 
@@ -168,10 +169,44 @@ aggregation where error is not**: mean bias per series times 1,599 series equals
 network total to the last digit, while MASE improves 27% at total level. That last one is the
 result with the largest inventory consequence and it is the one least often stated.
 
-**Inventory policy lab.** Safety stock from demand *and* lead time variability, comparing
-`(s,Q)`, `(R,S)` and periodic review, with Monte Carlo simulation of stockout and fill rate.
-The deliverable is the working-capital-per-service-point curve, which is the one chart a CFO
-reads in five seconds.
+**Inventory policy lab** *(complete — [module README](../src/oplab/inventory/README.md))*.
+Safety stock from demand *and* lead-time variability, `(s,Q)` against `(R,S)`, Monte Carlo
+simulation of stockout and fill rate, and the working-capital-per-service-point curve as the
+deliverable.
+
+It needed a new table in the generator. Inbound receipts describe dock-to-stock, which is a
+warehouse interval; an inventory policy needs the supplier lead time, from order placed to stock
+receivable, and the two are routinely confused because the warehouse owns the data for the first
+and nobody owns the data for the second. `generate_purchase_orders` is appended at the end of the
+generator for the same reason the layout is, so every table and every published figure above it
+keeps reproducing byte for byte. Its supplier profiles hold one property deliberately: mean lead
+time and lead-time variability are uncorrelated, because if short lead times came bundled with low
+variability every comparison would rank suppliers the same way on either property and the whole
+point would be unobservable.
+
+Four results, plus one that is a limitation rather than a result:
+
+- **Sizing on the quoted lead time misses 58% of the stock the service level needs** (BRL 192,305
+  against BRL 121,522 over 191 SKUs). The gap is invisible in review because both figures come
+  out of the same formula.
+- **Which variance is the lever has a closed form**: lead-time variability dominates when
+  `CV_L² · L > CV_d²`, so there is one demand-CV threshold per supplier. It is the lever for two
+  of these four suppliers and not for the other two, so the usual blanket claim in either
+  direction is wrong half the time.
+- **The shorter lead time can need the larger buffer** — 57% longer and 34% less safety stock —
+  while total inventory does not invert, because pipeline stock scales with the mean.
+- **A 99% commitment sized as cycle service costs 82% more than the same commitment sized as fill
+  rate**, and the cheapest point of service is not on the curve at all: the entire forecasting
+  headroom from tool 9 releases 0.26% of the buffer while capping one supplier's worst 5% of
+  deliveries releases 23.7%.
+
+The limitation is the one worth recording. The first simulation results were an artefact: on a
+one-year horizon the same policy on the same data measured between 89.3% and 97.3% cycle service
+depending only on whether it opened full, at the reorder point, or empty. A horizon that short
+contains few replenishment cycles, so the opening assumption is a large share of the sample. A
+warm-up of two cycles collapses the spread to 1.2 points. It was believable in both directions,
+which is what made it dangerous, so `warmup` defaults to a computed value rather than to zero and
+the range is asserted in the claim tests.
 
 ## Cross-cutting
 

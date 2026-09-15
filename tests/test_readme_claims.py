@@ -690,6 +690,303 @@ def test_forecast_tables(full: Dataset) -> None:
     )
 
 
+def test_inventory_tables(full: Dataset) -> None:
+    """oplab/inventory/README.md: the contract understates the buffer, the lever has a closed
+    form, the two service definitions differ by 82%, and the cheapest point is off the curve."""
+    from dataclasses import replace
+
+    import numpy as np
+
+    from oplab.forecast import to_panel
+    from oplab.inventory import (
+        ContinuousReview,
+        achieved_curve,
+        expected_fill_rate,
+        fit_demand,
+        fit_lead_time,
+        lead_time_by_supplier,
+        reorder_point,
+        safety_stock,
+        simulate_policy,
+        z_for_cycle_service,
+        z_for_fill_rate,
+    )
+    from oplab.inventory.normal import norm_cdf
+
+    orders = full.purchase_orders
+    unit_cost = full.catalog.set_index("sku")["unit_cost"]
+    panel = to_panel(
+        full.demand.loc[full.demand["site"].astype(str) == "CD-SP"], freq="D", key=("sku",)
+    )
+    regular = panel.loc[:, (panel == 0).mean() <= 0.2]
+    supplier_of = orders.drop_duplicates("sku").set_index("sku")["supplier"]
+    lead_times = {
+        name: fit_lead_time(
+            group["lead_days"].to_numpy(), quoted=float(group["quoted_lead_days"].iloc[0])
+        )
+        for name, group in orders.groupby("supplier")
+    }
+    z = z_for_cycle_service(0.95)
+
+    # Finding 1, the supplier table: the quote tracks the mean and says nothing about the spread.
+    table = lead_time_by_supplier(orders).set_index("supplier")
+    expected_lead = {
+        "FORN-REGIONAL": (5.0, 5.22, 1.03, 0.20, 1.74, 6.93),
+        "FORN-NACIONAL": (7.0, 7.77, 3.56, 0.46, 3.55, 13.10),
+        "FORN-CONTRATO": (12.0, 12.17, 1.58, 0.13, 0.99, 14.82),
+        "FORN-IMPORT": (30.0, 31.68, 4.85, 0.15, 5.58, 36.88),
+    }
+    for supplier, (quoted, mean, sd, cv, skew, p95) in expected_lead.items():
+        row = table.loc[supplier]
+        assert row["quoted_lead_days"] == pytest.approx(quoted)
+        assert row["mean_lead_days"] == pytest.approx(mean, abs=5e-3)
+        assert row["sd_lead_days"] == pytest.approx(sd, abs=5e-3)
+        assert row["cv_lead_days"] == pytest.approx(cv, abs=5e-3)
+        assert row["skew_lead_days"] == pytest.approx(skew, abs=5e-3)
+        assert row["p95_lead_days"] == pytest.approx(p95, abs=5e-3)
+        # Every distribution is right skewed, which is what Finding 5 turns into a decision.
+        assert row["skew_lead_days"] > 0.0
+
+    # Finding 1, the money: sizing on the quote misses 58% of the requirement.
+    rows = []
+    for sku in regular.columns:
+        supplier = supplier_of.get(sku)
+        if supplier is None:
+            continue
+        demand = fit_demand(regular[sku].to_numpy())
+        if demand.mean <= 0.0:
+            continue
+        profile = lead_times[supplier]
+        realised = safety_stock(demand, profile, z)
+        on_quote = safety_stock(demand, profile, z, use_quoted_lead_time=True)
+        cost = float(unit_cost[sku])
+        rows.append(
+            {
+                "sku": sku,
+                "supplier": supplier,
+                "demand_cv": demand.cv,
+                "lead_share": realised.lead_time_share,
+                "crossover_cv": float(np.sqrt(profile.cv**2 * profile.mean)),
+                "capital": realised.units * cost,
+                "capital_on_quote": on_quote.units * cost,
+            }
+        )
+    sized = pd.DataFrame(rows)
+    assert len(sized) == 191
+
+    by_supplier = sized.groupby("supplier").agg(
+        skus=("sku", "size"),
+        capital=("capital", "sum"),
+        on_quote=("capital_on_quote", "sum"),
+        crossover=("crossover_cv", "first"),
+        demand_cv=("demand_cv", "mean"),
+        lead_share=("lead_share", "mean"),
+        dominates=("lead_share", lambda s: float((s > 0.5).mean())),
+    )
+    expected_supplier = {
+        "FORN-NACIONAL": (68, 82181, 38781, 0.5281, 1.277, 0.757, 0.741, 0.971),
+        "FORN-IMPORT": (32, 37971, 23049, 0.3930, 0.861, 0.733, 0.585, 0.938),
+        "FORN-CONTRATO": (36, 39574, 32375, 0.1819, 0.452, 0.756, 0.280, 0.000),
+        "FORN-REGIONAL": (55, 32579, 27318, 0.1615, 0.452, 0.777, 0.272, 0.000),
+    }
+    for supplier, values in expected_supplier.items():
+        skus, capital, quote, understated, crossover, cv_d, share, dominates = values
+        row = by_supplier.loc[supplier]
+        assert row["skus"] == skus
+        assert row["capital"] == pytest.approx(capital, abs=1.0)
+        assert row["on_quote"] == pytest.approx(quote, abs=1.0)
+        assert 1 - row["on_quote"] / row["capital"] == pytest.approx(understated, abs=5e-4)
+        assert row["crossover"] == pytest.approx(crossover, abs=5e-4)
+        assert row["demand_cv"] == pytest.approx(cv_d, abs=5e-4)
+        assert row["lead_share"] == pytest.approx(share, abs=5e-4)
+        assert row["dominates"] == pytest.approx(dominates, abs=5e-4)
+
+    total, on_quote = sized["capital"].sum(), sized["capital_on_quote"].sum()
+    assert total == pytest.approx(192305, abs=1.0)
+    assert on_quote == pytest.approx(121522, abs=1.0)
+    assert 1 - on_quote / total == pytest.approx(0.368, abs=5e-4)
+    assert total / on_quote - 1 == pytest.approx(0.58, abs=5e-3)
+    assert (sized["lead_share"] > 0.5).mean() == pytest.approx(0.50, abs=5e-3)
+
+    # Finding 2: the crossover condition is arithmetic, not a fitted rule.
+    for supplier, profile in lead_times.items():
+        crossover = float(np.sqrt(profile.cv**2 * profile.mean))
+        group = sized.loc[sized["supplier"] == supplier]
+        assert ((group["demand_cv"] < crossover) == (group["lead_share"] > 0.5)).all(), supplier
+
+    # Finding 3: safety stock inverts against lead time, and total inventory does not.
+    sku = regular.sum().sort_values(ascending=False).index[20]
+    assert sku == "SKU-00345"
+    demand = fit_demand(regular[sku].to_numpy())
+    assert demand.mean == pytest.approx(23.9, abs=5e-2)
+    assert demand.cv == pytest.approx(0.59, abs=5e-3)
+
+    compared = {}
+    for name, profile in lead_times.items():
+        stock = safety_stock(demand, profile, z)
+        compared[name] = (stock.units, demand.mean * profile.mean)
+    expected_units = {
+        "FORN-REGIONAL": (67.1, 124.7),
+        "FORN-NACIONAL": (154.4, 185.9),
+        "FORN-CONTRATO": (102.5, 291.1),
+        "FORN-IMPORT": (231.7, 757.7),
+    }
+    for name, (safety, pipeline) in expected_units.items():
+        assert compared[name][0] == pytest.approx(safety, abs=5e-2)
+        assert compared[name][1] == pytest.approx(pipeline, abs=5e-2)
+
+    fast, slow = "FORN-NACIONAL", "FORN-CONTRATO"
+    fast_lead, slow_lead = lead_times[fast], lead_times[slow]
+    assert slow_lead.mean / fast_lead.mean - 1 == pytest.approx(0.57, abs=5e-3)
+    assert 1 - compared[slow][0] / compared[fast][0] == pytest.approx(0.34, abs=5e-3)
+    assert fast_lead.sd / slow_lead.sd == pytest.approx(2.3, abs=5e-2)
+    # Total inventory keeps the order the lead times imply - the honest qualification.
+    assert sum(compared[fast]) < sum(compared[slow])
+
+    # Finding 4: the same 99% sized two ways differs by 82%.
+    profile = lead_times[supplier_of[sku]]
+    assert supplier_of[sku] == "FORN-IMPORT"
+    quantity = round(demand.mean * 28)
+    sigma = safety_stock(demand, profile, 1.0).sigma
+    as_cycle = safety_stock(demand, profile, z_for_cycle_service(0.99))
+    z_fill = z_for_fill_rate(0.99, sigma, quantity)
+    as_fill = safety_stock(demand, profile, z_fill)
+    assert as_cycle.z == pytest.approx(2.326, abs=5e-4)
+    assert z_fill == pytest.approx(1.279, abs=5e-4)
+    assert as_cycle.units == pytest.approx(327.7, abs=5e-2)
+    assert as_fill.units == pytest.approx(180.2, abs=5e-2)
+    assert as_cycle.units / as_fill.units - 1 == pytest.approx(0.82, abs=5e-3)
+    assert expected_fill_rate(as_cycle.z, sigma, quantity) == pytest.approx(0.9993, abs=5e-5)
+    assert norm_cdf(z_fill) == pytest.approx(0.8996, abs=5e-5)
+
+    # Finding 5: the price per point rises elevenfold and the last half-point buys 0.07%.
+    curve = achieved_curve(
+        demand,
+        profile,
+        quantity,
+        float(unit_cost[sku]),
+        regular[sku],
+        periods=1095,
+        replications=40,
+    )
+    expected_curve = {
+        0.800: (665, float("nan"), 0.8920, 0.9829),
+        0.900: (1013, 34.76, 0.9469, 0.9892),
+        0.950: (1300, 57.42, 0.9625, 0.9917),
+        0.980: (1623, 107.70, 0.9825, 0.9944),
+        0.990: (1838, 215.41, 0.9855, 0.9950),
+        0.995: (2035, 394.28, 0.9862, 0.9955),
+    }
+    indexed = curve.set_index("cycle_service_target")
+    for target, (capital, per_point, cycle, fill) in expected_curve.items():
+        row = indexed.loc[target]
+        assert row["safety_capital"] == pytest.approx(capital, abs=1.0)
+        if per_point != per_point:
+            assert pd.isna(row["capital_per_point"])
+        else:
+            assert row["capital_per_point"] == pytest.approx(per_point, abs=5e-3)
+        assert row["achieved_cycle_service"] == pytest.approx(cycle, abs=5e-5)
+        assert row["achieved_fill_rate"] == pytest.approx(fill, abs=5e-5)
+
+    per_point = curve["capital_per_point"].dropna()
+    assert per_point.iloc[-1] / per_point.iloc[0] == pytest.approx(11.0, abs=0.5)
+    top = curve.tail(2).reset_index(drop=True)
+    assert top.loc[1, "safety_capital"] / top.loc[0, "safety_capital"] - 1 == pytest.approx(
+        0.11, abs=5e-3
+    )
+    achieved_gain = top.loc[1, "achieved_cycle_service"] - top.loc[0, "achieved_cycle_service"]
+    assert achieved_gain == pytest.approx(0.0007, abs=5e-5)
+
+    # Finding 6: the reliability lever is 92 times the whole forecasting lever.
+    z99 = z_for_cycle_service(0.99)
+    base = safety_stock(demand, profile, z99).units
+    forecast = safety_stock(replace(demand, sd=demand.sd * (1 - 0.008)), profile, z99).units
+    capped_profile = fit_lead_time(
+        np.minimum(profile.sample, profile.quantile(0.95)), quoted=profile.quoted
+    )
+    capped = safety_stock(demand, capped_profile, z99)
+    assert base == pytest.approx(327.7, abs=5e-2)
+    assert forecast == pytest.approx(326.8, abs=5e-2)
+    assert capped.units == pytest.approx(249.9, abs=5e-2)
+    gain_forecast = 1 - forecast / base
+    gain_reliability = 1 - capped.units / base
+    assert gain_forecast == pytest.approx(0.0026, abs=5e-5)
+    assert gain_reliability == pytest.approx(0.237, abs=5e-4)
+    assert gain_reliability / gain_forecast == pytest.approx(92.0, abs=0.5)
+
+    # And the smaller policy still delivers, which is what makes it not a trade.
+    achieved = simulate_policy(
+        ContinuousReview(
+            reorder_point=reorder_point(demand, capped_profile, capped), order_quantity=quantity
+        ),
+        regular[sku].to_numpy(dtype=float),
+        capped_profile.sample,
+        periods=1095,
+        replications=40,
+    ).summary()
+    assert achieved["cycle_service"] == pytest.approx(0.9886, abs=5e-5)
+
+
+def test_the_warmup_finding_reproduces(full: Dataset) -> None:
+    """oplab/inventory/README.md: without a warm-up the same policy measures 89% to 97%.
+
+    This is a limitation rather than a result, and it is asserted for the same reason as the
+    results: it is the number that justifies a default, and a change that quietly made the
+    default unnecessary should break the build rather than leave the text stale.
+    """
+    from oplab.forecast import to_panel
+    from oplab.inventory import (
+        ContinuousReview,
+        fit_demand,
+        fit_lead_time,
+        reorder_point,
+        safety_stock,
+        simulate_policy,
+        z_for_cycle_service,
+    )
+
+    orders = full.purchase_orders
+    panel = to_panel(
+        full.demand.loc[full.demand["site"].astype(str) == "CD-SP"], freq="D", key=("sku",)
+    )
+    regular = panel.loc[:, (panel == 0).mean() <= 0.2]
+    sku = regular.sum().sort_values(ascending=False).index[20]
+    supplier = orders.drop_duplicates("sku").set_index("sku")["supplier"][sku]
+    profile = fit_lead_time(
+        orders.loc[orders["supplier"] == supplier, "lead_days"].to_numpy(),
+        quoted=float(orders.loc[orders["supplier"] == supplier, "quoted_lead_days"].iloc[0]),
+    )
+    demand = fit_demand(regular[sku].to_numpy())
+    sized = safety_stock(demand, profile, z_for_cycle_service(0.95))
+    policy = ContinuousReview(
+        reorder_point=reorder_point(demand, profile, sized),
+        order_quantity=round(demand.mean * 28),
+    )
+
+    def measure(opening: float | None, warmup: int | None) -> float:
+        result = simulate_policy(
+            policy,
+            regular[sku].to_numpy(dtype=float),
+            profile.sample,
+            periods=365,
+            replications=40,
+            initial_stock=opening,
+            warmup=warmup,
+        )
+        return float(result.summary()["cycle_service"])
+
+    openings: list[float | None] = [None, float(policy.reorder_point), 0.0]
+    without = [measure(opening, 0) for opening in openings]
+    with_warmup = [measure(opening, None) for opening in openings]
+
+    # The published range: 89% to 97% on identical data, decided by an unstated assumption.
+    assert min(without) == pytest.approx(0.8933, abs=5e-4)
+    assert max(without) == pytest.approx(0.9731, abs=5e-4)
+    assert max(without) - min(without) == pytest.approx(0.0798, abs=5e-4)
+    # The warm-up collapses it to under a point.
+    assert max(with_warmup) - min(with_warmup) == pytest.approx(0.0118, abs=5e-4)
+
+
 def test_examples_run_without_error() -> None:
     """The three example scripts are part of the deliverable; a broken one is a broken README."""
     import runpy
@@ -699,7 +996,7 @@ def test_examples_run_without_error() -> None:
 
     root = Path(__file__).resolve().parents[1]
     scripts = sorted((root / "examples").glob("*.py"))
-    assert len(scripts) == 9
+    assert len(scripts) == 10
 
     for script in scripts:
         captured, sys.stdout = sys.stdout, StringIO()

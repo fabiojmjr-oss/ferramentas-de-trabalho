@@ -38,8 +38,9 @@ one silently.
 | `oplab.routing` | What does a delivery cost, and which decisions can the model settle? | [README](src/oplab/routing/README.md) |
 | `oplab.benchmark` | Which site is underperforming once size and geography are held constant? | [README](src/oplab/benchmark/README.md) |
 | `oplab.forecast` | Does the forecast beat doing nothing, and how would you know? | [README](src/oplab/forecast/README.md) |
+| `oplab.inventory` | What does a point of service level cost, and which lever buys it? | [README](src/oplab/inventory/README.md) |
 
-Three more tools are planned. Build sequence and selection rule in
+One more tool is planned. Build sequence and selection rule in
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Install
@@ -63,7 +64,7 @@ print(service_sensitivity(dataset.order_lines))  # one order book, four conventi
 
 ---
 
-## Nine things it demonstrates
+## Ten things it demonstrates
 
 ### 1. A sixteen-point service spread with no change to the operation
 
@@ -311,6 +312,52 @@ Details in the [module README](src/oplab/forecast/README.md).
 
 ---
 
+### 10. The service level in the contract is priced with a lead time nobody measured
+
+Safety stock is sized against two variances: demand per period and replenishment lead time. The
+first is estimated from data; the second is almost always taken from the supplier's quoted lead
+time, which sets its variability to zero. Every supplier here delivers close to its quoted **mean**,
+which is why the contract is never challenged — and says nothing about the spread:
+
+| Supplier | Quoted | Realised mean | Realised sd | CV |
+| --- | --- | --- | --- | --- |
+| FORN-NACIONAL | 7.0 | 7.77 | 3.56 | **0.46** |
+| FORN-CONTRATO | 12.0 | 12.17 | 1.58 | **0.13** |
+
+Across 191 regular SKUs at a 95% cycle service level the requirement is **BRL 192,305**. Sized on
+the quoted lead times it comes to BRL 121,522 — **the plan is missing 58% of the stock the service
+level needs**, and the gap is invisible because both numbers come out of the same formula.
+
+Three consequences follow, each of which reverses a common instinct.
+
+**Which variance is the lever has a closed form.** Lead-time variability dominates exactly when
+`CV_L² · L > CV_d²`, so there is one demand-CV threshold per supplier — 0.45, 0.45, 0.86, 1.28
+here. Demand CV sits near 0.76 across the assortment, so lead time is the lever for two suppliers
+and demand is the lever for the other two. The question "is it lead time or forecast accuracy?"
+has no general answer, and two numbers you already have settle it per supplier.
+
+**The shorter lead time can need the larger buffer.** FORN-CONTRATO takes 57% longer than
+FORN-NACIONAL and needs **34% less** safety stock, because its lead time is 2.3 times tighter. The
+honest qualification: total inventory does not invert, because pipeline stock scales with the mean.
+
+**A 99% commitment sized as cycle service costs 82% more than the same commitment sized as fill
+rate** — 328 units against 180. Neither is wrong; they count different things, and the conversion
+needs the order quantity, which is why no fudge factor exists.
+
+The deliverable is the curve, and it prices the argument rather than settling it by authority: a
+point of cycle service costs BRL 34.76 at the bottom and BRL 394.28 at the top, eleven times as
+much. **The top of the curve buys nothing measurable** — 99.0% to 99.5% costs 11% more capital and
+delivers +0.07% of simulated cycle service, because what remains is the lead time's skewed tail.
+
+And the cheapest point of service is not on the curve at all. Spending the *entire* forecasting
+headroom from finding 9 releases 0.26% of the buffer. Capping one supplier's worst 5% of
+deliveries releases 23.7% — **a factor of 92** — and the smaller policy still measures 98.9%
+cycle service against a 99% promise.
+
+Details in the [module README](src/oplab/inventory/README.md).
+
+---
+
 ## Design principles
 
 **Validate at the boundary.** Every public KPI function checks its input against a contract in
@@ -390,7 +437,12 @@ Stated plainly, because the gaps matter as much as the coverage:
   one-line rules, no ETS or ARIMA, no exogenous regressors and no prediction intervals. A
   serious model belongs in the same harness, compared on the same table. See the
   [module README](src/oplab/forecast/README.md).
-- There is no process mining or inventory policy work yet. Those are the rest of wave 4 of
+- The inventory lab is single-echelon and single-supplier per item, resamples demand without
+  autocorrelation, assumes lost sales rather than backorders, and does not size intermittent
+  items at all. Its simulation needs a warm-up, and the warm-up is the finding: without one
+  the same policy measured between 89.3% and 97.3% cycle service on identical data. See the
+  [module README](src/oplab/inventory/README.md).
+- There is no process mining yet. It is the last item of wave 4 of
   [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Development
@@ -402,12 +454,12 @@ make check-all  # the above plus every documented figure re-derived
 make claims     # re-derive every number quoted in a README
 ```
 
-**429 tests, 95% statement coverage, split by cost.** `make check` runs 413 of them in about
-ten seconds and is what a push is gated on. The remaining 16 re-solve the routing problems,
-re-replicate the simulations, re-run the forecast backtests and execute all nine example scripts
-to verify every figure quoted above; they take under six minutes, and they do not depend on the
-interpreter version, so CI runs the fast gate across Python 3.10 and 3.12 and the figure
-verification once.
+**501 tests, 96% statement coverage, split by cost.** `make check` runs 483 of them in about
+twenty seconds and is what a push is gated on. The remaining 18 re-solve the routing problems,
+re-replicate the simulations, re-run the forecast backtests and the inventory policy runs, and
+execute all ten example scripts to verify every figure quoted above; they take under six minutes, and they
+do not depend on the interpreter version, so CI runs the fast gate across Python 3.10 and 3.12 and
+the figure verification once.
 
 `make check` exists because the alternative failed twice: running the linter but forgetting the
 formatter, and running a locally installed tool older than the one CI installs. Both turned a
