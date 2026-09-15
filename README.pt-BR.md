@@ -506,8 +506,8 @@ make claims     # re-deriva todo número citado em um README
 deles em cerca de trinta segundos e é o que barra um push. Os 19 restantes re-resolvem os problemas
 de roteirização, re-replicam as simulações, re-rodam os backtests de previsão e as políticas de
 estoque, e executam os onze scripts de exemplo para verificar toda figura citada acima; levam
-TIMING_PT, e não dependem da versão do interpretador — então a CI roda o portão rápido em Python
-3.10 e 3.12 e a verificação de figuras uma vez.
+cerca de seis minutos, e não dependem da versão do interpretador — então a CI roda o portão rápido
+em Python 3.10 e 3.12 e a verificação de figuras uma vez.
 
 O `make check` existe porque a alternativa falhou duas vezes: rodar o linter e esquecer o
 formatador, e rodar uma ferramenta local mais antiga que a instalada pela CI. As duas

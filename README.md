@@ -500,8 +500,8 @@ make claims     # re-derive every number quoted in a README
 **537 tests, 96% statement coverage, split by cost.** `make check` runs 518 of them in about
 thirty seconds and is what a push is gated on. The remaining 19 re-solve the routing problems,
 re-replicate the simulations, re-run the forecast backtests and the inventory policy runs, and
-execute all eleven example scripts to verify every figure quoted above; they take TIMING_EN, and
-they do not depend on the interpreter version, so CI runs the fast gate across Python 3.10 and 3.12
+execute all eleven example scripts to verify every figure quoted above; they take about six minutes.
+They do not depend on the interpreter version, so CI runs the fast gate across Python 3.10 and 3.12
 and the figure verification once.
 
 `make check` exists because the alternative failed twice: running the linter but forgetting the
